@@ -1,0 +1,8 @@
+.env
+*.pyc
+__pycache__/
+notified_item_ids.json
+dealfinder_api_calls.json
+.DS_Store
+.vscode/
+.idea/
