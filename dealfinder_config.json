@@ -1,0 +1,17 @@
+{
+  "consoles": [
+    "PS5",
+    "Xbox Series X",
+    "PC"
+  ],
+  "profiles": [
+    "casual",
+    "competitive",
+    "streamer"
+  ],
+  "rare_items": [
+    "golden sword",
+    "mythical shield",
+    "epic potion"
+  ]
+}
