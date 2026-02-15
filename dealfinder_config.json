@@ -1,97 +1,733 @@
-"lenovo_legion_go_2_512gb": {
-    "name": "Lenovo Legion Go 2 512GB",
-    "search_base": "Lenovo Legion Go 2 512GB",
-    "default_sell_price": 500.0,
-    "fee_rate": 0.14,
-    "ship_out": 10.0,
-    "packaging": 1.0,
-    "must_include_any": ["lenovo", "legion", "go", "2"],
-    "min_buy_total": 150.0,
-    "exclude_words": ["1tb", "256", "64"],
-    "search_bases": ["Lenovo Legion Go 2 512GB"]
-},
-
-    "ps5_pro": {
-      "name": "PS5 Pro",
-      "search_base": "PS5 Pro Console",
-      "default_sell_price": 550.0,
+{
+  "consoles": {
+    "ps5_disc": {
+      "name": "PS5 Disc",
+      "search_base": "PS5 disc console",
+      "default_sell_price": 250.0,
       "fee_rate": 0.13,
       "ship_out": 11.0,
       "packaging": 2.0,
-      "must_include_any": ["ps5", "pro"],
-      "min_buy_total": 100.0,
-      "exclude_words": ["slim", "digital", "disc drive", "controller"],
-      "search_bases": ["PS5 Pro Console"]
+      "must_include_any": [
+        "disk",
+        "disc"
+      ],
+      "min_buy_total": 30.0,
+      "exclude_words": [
+        "slim",
+        "disc drive",
+        "controller"
+      ],
+      "search_bases": [
+        "PS5 disc console",
+        "Playstation 5 disk",
+        "PS5 Disc"
+      ]
     },
-    "xbox_series_x_galaxy": {
-      "name": "Xbox Series X Galaxy Black",
-      "search_base": "Xbox Series X Galaxy Black",
-      "default_sell_price": 320.0,
+    "ps5_digital": {
+      "name": "PS5 Digital",
+      "search_base": "PS5 digital console",
+      "default_sell_price": 250.0,
+      "fee_rate": 0.13,
+      "ship_out": 11.0,
+      "packaging": 2.0,
+      "must_include_any": [
+        "ps5",
+        "digital"
+      ],
+      "min_buy_total": 0.0,
+      "exclude_words": [
+        "slim",
+        "repair",
+        "disc",
+        "controller"
+      ],
+      "search_bases": [
+        "PS5 digital console"
+      ]
+    },
+    "ps5_slim_disc": {
+      "name": "PS5 Slim Disc",
+      "search_base": "PS5 Slim Disc Console",
+      "default_sell_price": 300.0,
+      "fee_rate": 0.13,
+      "ship_out": 11.0,
+      "packaging": 2.0,
+      "must_include_any": [
+        "ps5",
+        "slim",
+        "disc"
+      ],
+      "min_buy_total": 70.0,
+      "exclude_words": [
+        "repair",
+        "disc drive",
+        "digital"
+      ],
+      "search_bases": [
+        "PS5 Slim Disc Console"
+      ]
+    },
+    "ps5_slim_digital": {
+      "name": "PS5 Slim Digital",
+      "search_base": "PS5 Slim Digital Console",
+      "default_sell_price": 270.0,
+      "fee_rate": 0.13,
+      "ship_out": 11.0,
+      "packaging": 2.0,
+      "must_include_any": [
+        "ps5",
+        "digital",
+        "slim"
+      ],
+      "min_buy_total": 70.0,
+      "exclude_words": [
+        "repair",
+        "disc"
+      ],
+      "search_bases": [
+        "PS5 Slim Digital Console"
+      ]
+    },
+    "xbox_series_x": {
+      "name": "Xbox Series X",
+      "search_base": "Xbox Series X Console",
+      "default_sell_price": 260.0,
       "fee_rate": 0.13,
       "ship_out": 10.0,
       "packaging": 2.0,
-      "must_include_any": ["series x", "galaxy"],
-      "min_buy_total": 60.0,
-      "exclude_words": ["series s", "box only", "xbox one"],
-      "search_bases": ["Xbox Series X Galaxy Black"]
-    },
-    "xbox_series_s_galaxy": {
-      "name": "Xbox Series S Galaxy Black",
-      "search_base": "Xbox Series S Galaxy Black",
-      "default_sell_price": 170.0,
-      "fee_rate": 0.13,
-      "ship_out": 10.0,
-      "packaging": 2.0,
-      "must_include_any": ["series s", "galaxy"],
+      "must_include_any": [
+        "series x"
+      ],
       "min_buy_total": 50.0,
-      "exclude_words": ["series x", "box only", "xbox one"],
-      "search_bases": ["Xbox Series S Galaxy Black"]
+      "exclude_words": [
+        "series s",
+        "box only",
+        "xbox one",
+        "robot"
+      ],
+      "search_bases": [
+        "Xbox Series X Console"
+      ]
     },
-    "steam_deck_oled_512gb": {
-      "name": "Steam Deck OLED 512GB",
-      "search_base": "Steam Deck OLED 512GB",
-      "default_sell_price": 420.0,
+    "xbox_series_s": {
+      "name": "Xbox Series S",
+      "search_base": "Xbox Series S Console",
+      "default_sell_price": 140.0,
+      "fee_rate": 0.13,
+      "ship_out": 10.0,
+      "packaging": 2.0,
+      "must_include_any": [
+        "xbox",
+        "series s"
+      ],
+      "min_buy_total": 50.0,
+      "exclude_words": [
+        "series x",
+        "box only",
+        "xbox one"
+      ],
+      "search_bases": [
+        "Xbox Series S Console"
+      ]
+    },
+    "steam_deck_512gb": {
+      "name": "Steam Deck 512GB",
+      "search_base": "Steam Deck 512GB",
+      "default_sell_price": 300.0,
       "fee_rate": 0.13,
       "ship_out": 5.0,
       "packaging": 1.0,
-      "must_include_any": ["steam deck", "oled", "512"],
-      "min_buy_total": 50.0,
-      "exclude_words": ["256", "64", "lcd"],
-      "search_bases": ["Steam Deck OLED 512GB"]
+      "must_include_any": [
+        "512gb"
+      ],
+      "min_buy_total": 30.0,
+      "exclude_words": [
+        "256",
+        "64"
+      ],
+      "search_bases": [
+        "Steam Deck 512GB"
+      ]
     },
-    "steam_deck_oled_1tb": {
-      "name": "Steam Deck OLED 1TB",
-      "search_base": "Steam Deck OLED 1TB",
-      "default_sell_price": 480.0,
+    "steam_deck_256gb": {
+      "name": "Steam Deck 256GB",
+      "search_base": "Steam Deck 256GB",
+      "default_sell_price": 250.0,
       "fee_rate": 0.13,
       "ship_out": 5.0,
       "packaging": 1.0,
-      "must_include_any": ["steam deck", "oled", "1tb"],
-      "min_buy_total": 60.0,
-      "exclude_words": ["256", "512", "64", "lcd"],
-      "search_bases": ["Steam Deck OLED 1TB"]
+      "must_include_any": [
+        "steam deck",
+        "256gb"
+      ],
+      "min_buy_total": 30.0,
+      "exclude_words": [
+        "512",
+        "64"
+      ],
+      "search_bases": [
+        "Steam Deck 256GB"
+      ]
     },
-    "rog_ally_z1_extreme_512gb": {
-      "name": "ROG Ally Z1 Extreme 512GB",
-      "search_base": "ROG Ally Z1 Extreme 512GB",
-      "search_bases": ["ROG Ally Z1 Extreme 512GB"],
-      "default_sell_price": 320.0,
+    "rog_ally_z1_extreme_1tb": {
+      "name": "ROG Ally Z1 Extreme 1TB",
+      "search_base": "ROG Ally Z1 Extreme 1TB",
+      "search_bases": [
+        "ROG Ally Z1 Extreme 1TB"
+      ],
+      "default_sell_price": 380.0,
       "fee_rate": 0.13,
       "ship_out": 10.0,
       "packaging": 2.0,
-      "must_include_any": ["rog ally", "z1", "512"],
+      "must_include_any": [
+        "z1",
+        "1tb"
+      ],
       "min_buy_total": 40.0,
-      "exclude_words": ["1tb"]
+      "exclude_words": [
+        "512"
+      ]
     },
-    "rog_ally_x_1tb": {
-      "name": "ROG Ally X 1TB",
-      "search_base": "ROG Ally X 1TB",
-      "search_bases": ["ROG Ally X 1TB"],
+    "lenovo_legion_go_512gb": {
+      "name": "Lenovo Legion Go 512GB",
+      "search_base": "Lenovo Legion Go 512GB",
+      "search_bases": [
+        "Lenovo Legion Go 512GB"
+      ],
+      "default_sell_price": 300.0,
+      "fee_rate": 0.13,
+      "ship_out": 10.0,
+      "packaging": 2.0,
+      "must_include_any": [],
+      "min_buy_total": 40.0,
+      "exclude_words": [
+        "go 2"
+      ]
+    },
+    "lenovo_legion_go_2_512gb": {
+      "name": "Lenovo Legion Go 2 512GB",
+      "search_base": "Lenovo Legion Go 2 512GB",
+      "search_bases": [
+        "Lenovo Legion Go 2 512GB"
+      ],
       "default_sell_price": 450.0,
       "fee_rate": 0.13,
       "ship_out": 10.0,
       "packaging": 2.0,
-      "must_include_any": ["rog ally", "x", "1tb"],
-      "min_buy_total": 50.0,
-      "exclude_words": ["z1"]
+      "must_include_any": [
+        "go 2"
+      ],
+      "min_buy_total": 40.0,
+      "exclude_words": [
+        "go s"
+      ]
     }
+  },
+  "profiles": {
+    "PS5 Digital \u2013 HDMI / No Display": {
+      "console_id": "ps5_digital",
+      "fault_query": "no display hdmi",
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null,
+      "exclude_words": []
+    },
+    "PS5 Digital \u2013 Thermal Shutdown": {
+      "console_id": "ps5_digital",
+      "fault_query": "shuts down fan full overheating",
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null,
+      "exclude_words": []
+    },
+    "PS5 Slim Disc \u2013 HDMI / No Display": {
+      "console_id": "ps5_slim_disc",
+      "fault_query": "no display hdmi",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "PS5 Slim Digital \u2013 HDMI / No Display": {
+      "console_id": "ps5_slim_digital",
+      "fault_query": "no display hdmi",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox S HDMI no signal": {
+      "console_id": "xbox_series_s",
+      "fault_query": "HDMI no signal",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox S No Power": {
+      "console_id": "xbox_series_s",
+      "fault_query": "No Power",
+      "exclude_words": [],
+      "parts": 30.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox X No Power": {
+      "console_id": "xbox_series_x",
+      "fault_query": "No Power",
+      "exclude_words": [],
+      "parts": 30.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox X Fan Issue": {
+      "console_id": "xbox_series_x",
+      "fault_query": "Fan noise issue",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox S Fan Issue": {
+      "console_id": "xbox_series_s",
+      "fault_query": "Fan noise issue",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Xbox X HDMI no signal": {
+      "console_id": "xbox_series_x",
+      "fault_query": "HDMI no signal",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 512GB Boot error": {
+      "console_id": "steam_deck_512gb",
+      "fault_query": "Steam Deck 512GB Boot error",
+      "exclude_words": [],
+      "parts": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 512GB Fan issue": {
+      "console_id": "steam_deck_512gb",
+      "fault_query": "Steam Deck 512GB Fan issue",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 256GB Boot error": {
+      "console_id": "steam_deck_256gb",
+      "fault_query": "Steam Deck 256GB Boot error",
+      "exclude_words": [],
+      "parts": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 256GB Fan issue": {
+      "console_id": "steam_deck_256gb",
+      "fault_query": "Steam Deck 256GB Fan issue",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 256GB Stick drift": {
+      "console_id": "steam_deck_256gb",
+      "fault_query": "Steam Deck 256GB Stick drift",
+      "exclude_words": [],
+      "parts": 12.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Steam Deck 512GB Stick drift": {
+      "console_id": "steam_deck_512gb",
+      "fault_query": "Steam Deck 512GB Stick drift",
+      "exclude_words": [],
+      "parts": 12.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "PS5 Faulty Generic": {
+      "console_id": "ps5_disc",
+      "fault_query": "Faulty",
+      "exclude_words": [],
+      "parts": 20.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "PS5 Faulty Generic Digi": {
+      "console_id": "ps5_digital",
+      "fault_query": "PS5 Faulty",
+      "exclude_words": [],
+      "parts": 20.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "ROG Ally Z1 Extreme 1TB No Power": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "No power, wont turn on",
+      "exclude_words": [],
+      "parts": 30.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "ROG Ally Z1 Extreme 1TB Boot loop": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "ROG Ally Z1 Extreme 1TB Boot loop",
+      "exclude_words": [],
+      "parts": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "ROG Ally Z1 Extreme 1TB overheating": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "ROG Ally Z1 Extreme 1TB overheating",
+      "exclude_words": [],
+      "parts": 10.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "ROG Ally Z1 Extreme 1TB usbc issue": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "ROG Ally Z1 Extreme 1TB usbc issue",
+      "exclude_words": [],
+      "parts": 20.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "ROG Ally Z1 Extreme 1TB stick drift": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "ROG Ally Z1 Extreme 1TB stick drift",
+      "exclude_words": [],
+      "parts": 20.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Lenovo Legion Go 512GB no power": {
+      "console_id": "rog_ally_z1_extreme_1tb",
+      "fault_query": "Lenovo Legion Go 512GB no power",
+      "exclude_words": [],
+      "parts": 40.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    },
+    "Lenovo Legion Go 512GB wont boot": {
+      "console_id": "lenovo_legion_go_512gb",
+      "fault_query": "Lenovo Legion Go 512GB wont boot",
+      "exclude_words": [],
+      "parts": 20.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "sell_price_override": null
+    }
+  },
+  "rare_items": {
+    "stadium_events_nes": {
+      "name": "Stadium Events NES",
+      "search_query": "Stadium Events NES",
+      "sell_price": 22000.0,
+      "fee_rate": 0.13,
+      "ship_out": 3.0,
+      "packaging": 1.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "stadium events",
+        "nes"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 50.0
+    },
+    "shadow_tower_ps1": {
+      "name": "Shadow Tower PS1",
+      "search_query": "Shadow Tower PS1",
+      "sell_price": 500.0,
+      "fee_rate": 0.13,
+      "ship_out": 3.0,
+      "packaging": 1.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "shadow tower"
+      ],
+      "exclude_words": [
+        "book",
+        "no game",
+        "japan"
+      ],
+      "min_buy_total": 0.0
+    },
+    "red_sea_crossing_atari": {
+      "name": "Red Sea Crossing Atari",
+      "search_query": "Red Sea Crossing Atari",
+      "sell_price": 40000.0,
+      "fee_rate": 0.13,
+      "ship_out": 3.0,
+      "packaging": 1.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "red sea crossing"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "air_raid_atari": {
+      "name": "Air Raid Atari",
+      "search_query": "Air Raid Atari",
+      "sell_price": 40000.0,
+      "fee_rate": 0.13,
+      "ship_out": 3.0,
+      "packaging": 1.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "air raid"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "stronghold_atari": {
+      "name": "Stronghold Atari",
+      "search_query": "Stronghold Atari",
+      "sell_price": 40000.0,
+      "fee_rate": 0.13,
+      "ship_out": 3.0,
+      "packaging": 1.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "stronghold"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "snowboard_challenge_nes": {
+      "name": "Snowboard Challenge NES",
+      "search_query": "Snowboard Challenge NES",
+      "sell_price": 50000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "snowboard challenge"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "phantom_air_mission_nes": {
+      "name": "Phantom Air Mission NES",
+      "search_query": "Phantom Air Mission NES",
+      "sell_price": 50000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "phantom air mission"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "lethal_weapon_nes": {
+      "name": "Lethal Weapon NES",
+      "search_query": "Lethal Weapon NES",
+      "sell_price": 50000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "lethal weapon"
+      ],
+      "exclude_words": [
+        "advert"
+      ],
+      "min_buy_total": 0.0
+    },
+    "power_strike_ii_sega": {
+      "name": "Power Strike II Sega",
+      "search_query": "Power Strike II Sega",
+      "sell_price": 50000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [
+        "power strike ii"
+      ],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "super_mario_bros_nes": {
+      "name": "Super Mario Bros NES",
+      "search_query": "Super Mario Bros NES",
+      "sell_price": 50000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [
+        "console",
+        "plush",
+        "jigsaw"
+      ],
+      "min_buy_total": 0.0
+    },
+    "dinopark_tycoon_3do": {
+      "name": "DinoPark Tycoon 3DO",
+      "search_query": "DinoPark Tycoon 3DO",
+      "sell_price": 4000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "firewall_3do": {
+      "name": "Firewall 3DO",
+      "search_query": "Firewall 3DO",
+      "sell_price": 4000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "castlevania_amiga": {
+      "name": "Castlevania Amiga",
+      "search_query": "Castlevania Amiga",
+      "sell_price": 5000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "metal_gear_commodore_64": {
+      "name": "Metal Gear Commodore 64",
+      "search_query": "Metal Gear Commodore 64",
+      "sell_price": 5000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "cindy_s_fashion_world": {
+      "name": "Cindy's Fashion World",
+      "search_query": "Cindy's Fashion World",
+      "sell_price": 5000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "gamecube_underground": {
+      "name": "Gamecube Underground",
+      "search_query": "Gamecube Underground",
+      "sell_price": 5000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "gamecube_gadget_racers": {
+      "name": "Gamecube Gadget Racers",
+      "search_query": "Gamecube Gadget Racers",
+      "sell_price": 5000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "donkey_kong_country_competition_snes": {
+      "name": "Donkey Kong Country Competition SNES",
+      "search_query": "Donkey Kong Country Competition SNES",
+      "sell_price": 30000.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [],
+      "min_buy_total": 0.0
+    },
+    "harvest_moon_snes": {
+      "name": "Harvest Moon SNES",
+      "search_query": "Harvest Moon SNES",
+      "sell_price": 200.0,
+      "fee_rate": 0.13,
+      "ship_out": 0.0,
+      "packaging": 0.0,
+      "extra_costs": 0.0,
+      "target_profit": 0.0,
+      "must_include_any": [],
+      "exclude_words": [
+        "poster"
+      ],
+      "min_buy_total": 0.0
+    }
+  }
+}
