@@ -1900,7 +1900,8 @@ with tabs[5]:
                     j["ship_out"] = st.number_input("Postage out (£)", value=_stored_ship if _stored_ship > 0 else _console_ship, step=0.50, format="%.2f", key=k + "ship_out")
                     j["packaging"] = st.number_input("Packaging (£)", value=_stored_pack if _stored_pack > 0 else _console_pack, step=0.50, format="%.2f", key=k + "packaging")
 
-                _esp_default = float(j["expected_sell_price"] if j.get("expected_sell_price") is not None else (_console_sell or 0.0))
+                _stored_esp = float(j.get("expected_sell_price") or 0.0)
+                _esp_default = _stored_esp if _stored_esp > 0 else float(_console_sell or 0.0)
                 j["expected_sell_price"] = st.number_input(
                     "Expected sell price (£)",
                     value=_esp_default,
