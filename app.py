@@ -376,6 +376,17 @@ def load_config() -> Dict[str, Any]:
             j.setdefault("packaging", 0.0)
             j.setdefault("expected_sell_price", 0.0)
 
+        # Backfill expected_sell_price, ship_out and packaging from linked console when not yet set
+        for _, j in cfg["workshop_jobs"].items():
+            if j.get("console_id"):
+                linked = cfg["consoles"].get(j["console_id"], {})
+                if not j.get("expected_sell_price"):
+                    j["expected_sell_price"] = float(linked.get("default_sell_price") or 0.0)
+                if not j.get("ship_out"):
+                    j["ship_out"] = float(linked.get("ship_out") or 0.0)
+                if not j.get("packaging"):
+                    j["packaging"] = float(linked.get("packaging") or 0.0)
+
         return cfg
     except Exception:
         cfg = {"consoles": {}, "profiles": {}, "rare_items": {}}
@@ -1897,15 +1908,27 @@ with tabs[5]:
                     j["fee_rate"] = st.number_input("Fee rate (%)", value=float(j.get("fee_rate", _console_fee)) * 100.0, step=0.5, format="%.1f", key=k + "fee_rate") / 100.0
                     _stored_ship = float(j.get("ship_out", 0.0))
                     _stored_pack = float(j.get("packaging", 0.0))
-                    j["ship_out"] = st.number_input("Postage out (£)", value=_stored_ship if _stored_ship > 0 else _console_ship, step=0.50, format="%.2f", key=k + "ship_out")
-                    j["packaging"] = st.number_input("Packaging (£)", value=_stored_pack if _stored_pack > 0 else _console_pack, step=0.50, format="%.2f", key=k + "packaging")
+                    _ship_default = _stored_ship if _stored_ship > 0 else _console_ship
+                    _pack_default = _stored_pack if _stored_pack > 0 else _console_pack
+                    _ship_key = k + "ship_out"
+                    _pack_key = k + "packaging"
+                    if _ship_default > 0 and float(st.session_state.get(_ship_key) or 0.0) <= 0:
+                        st.session_state[_ship_key] = _ship_default
+                    if _pack_default > 0 and float(st.session_state.get(_pack_key) or 0.0) <= 0:
+                        st.session_state[_pack_key] = _pack_default
+                    j["ship_out"] = st.number_input("Postage out (£)", value=_ship_default, step=0.50, format="%.2f", key=_ship_key)
+                    j["packaging"] = st.number_input("Packaging (£)", value=_pack_default, step=0.50, format="%.2f", key=_pack_key)
 
-                _esp_default = float(j["expected_sell_price"] if j.get("expected_sell_price") is not None else (_console_sell or 0.0))
+                _stored_esp = float(j.get("expected_sell_price") or 0.0)
+                _esp_default = _stored_esp if _stored_esp > 0 else float(_console_sell or 0.0)
+                _esp_key = k + "expected_sell_price"
+                if _esp_default > 0 and float(st.session_state.get(_esp_key) or 0.0) <= 0:
+                    st.session_state[_esp_key] = _esp_default
                 j["expected_sell_price"] = st.number_input(
                     "Expected sell price (£)",
                     value=_esp_default,
                     step=1.0, format="%.2f",
-                    key=k + "expected_sell_price",
+                    key=_esp_key,
                     help="Pre-filled from linked product. Edit to override.",
                 )
 
