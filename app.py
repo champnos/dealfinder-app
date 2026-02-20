@@ -258,6 +258,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
     merged.setdefault("consoles", {})
     merged.setdefault("profiles", {})
     merged.setdefault("rare_items", {})
+    merged.setdefault("workshop_jobs", {})
 
     # Backup current config before overwrite
     try:
@@ -274,13 +275,16 @@ def save_config(cfg: Dict[str, Any]) -> None:
     os.replace(tmp_path, CONFIG_PATH)
 
 
-def save_all_config(consoles: Dict[str, Any], profiles: Dict[str, Any], rare_items: Dict[str, Any]) -> None:
+def save_all_config(consoles: Dict[str, Any], profiles: Dict[str, Any], rare_items: Dict[str, Any], workshop_jobs: Dict[str, Any] = None) -> None:
     """Save full config using current in-memory sections, via safe save_config."""
     cfg = load_config()
     cfg["consoles"] = consoles
     cfg["profiles"] = profiles
     cfg["rare_items"] = rare_items
+    if workshop_jobs is not None:
+        cfg["workshop_jobs"] = workshop_jobs
     save_config(cfg)
+
 
 def load_config() -> Dict[str, Any]:
     if not os.path.exists(CONFIG_PATH):
@@ -352,6 +356,24 @@ def load_config() -> Dict[str, Any]:
                 r["must_include_any"] = []
             if not isinstance(r.get("exclude_words"), list):
                 r["exclude_words"] = []
+
+        # Backfill/normalize expected fields (workshop jobs)
+        cfg.setdefault("workshop_jobs", {})
+        for _, j in cfg["workshop_jobs"].items():
+            j.setdefault("device_name", "Device")
+            j.setdefault("console_id", "")
+            j.setdefault("ebay_url", "")
+            j.setdefault("buy_price", 0.0)
+            j.setdefault("parts_cost", 0.0)
+            j.setdefault("extra_costs", 0.0)
+            j.setdefault("notes", "")
+            j.setdefault("date_purchased", "")
+            j.setdefault("status", "in_progress")
+            j.setdefault("sell_price", 0.0)
+            j.setdefault("date_sold", "")
+            j.setdefault("fee_rate", 0.13)
+            j.setdefault("ship_out", 0.0)
+            j.setdefault("packaging", 0.0)
 
         return cfg
     except Exception:
@@ -974,6 +996,7 @@ cfg = load_config()
 consoles: Dict[str, Any] = cfg["consoles"]
 profiles: Dict[str, Any] = cfg["profiles"]
 rare_items: Dict[str, Any] = cfg.get("rare_items", {})
+workshop_jobs: Dict[str, Any] = cfg.get("workshop_jobs", {})
 
 COMMON_CONDITIONS = [
     "New",
@@ -1199,7 +1222,7 @@ with st.sidebar:
         on_change=lambda: persist_ui_key("selected_rare_items_sidebar"),
     )
 
-tabs = st.tabs(["Scan", "Products", "Profiles", "Rare Scan", "Rare Items"])
+tabs = st.tabs(["Scan", "Products", "Profiles", "Rare Scan", "Rare Items", "Workshop"])
 
 # -----------------------------
 # Scan tab
@@ -1347,7 +1370,7 @@ with tabs[1]:
                     "min_buy_total": float(new_min_buy),
                     "exclude_words": [x.strip().lower() for x in new_excl.split(",") if x.strip()],
                 }
-                save_all_config(consoles, profiles, rare_items)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                 st.success(f"Created console: {cid}")
                 st.rerun()
 
@@ -1384,7 +1407,7 @@ with tabs[1]:
 
         if st.button("Save product changes", key=k + "save"):
             consoles[console_id] = copy.deepcopy(c)
-            save_all_config(consoles, profiles, rare_items)
+            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
             st.success("Product saved.")
 
         # Delete Product (safe)
@@ -1407,7 +1430,7 @@ with tabs[1]:
             if confirm_del_console:
                 if st.button("❌ Delete product", key=k + "delete_console"):
                     del consoles[console_id]
-                    save_all_config(consoles, profiles, rare_items)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                     st.success("Product deleted.")
                     st.rerun()
 
@@ -1451,7 +1474,7 @@ with tabs[2]:
                         "target_profit": float(new_target),
                         "sell_price_override": None if float(new_override) <= 0 else float(new_override),
                     }
-                    save_all_config(consoles, profiles, rare_items)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                     st.success("Profile created.")
                     st.rerun()
 
@@ -1495,7 +1518,7 @@ with tabs[2]:
 
             if st.button("Save profile changes", key=kp + "save"):
                 profiles[prof_name] = copy.deepcopy(p)
-                save_all_config(consoles, profiles, rare_items)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                 st.success("Profile saved.")
 
             # Delete Profile
@@ -1507,7 +1530,7 @@ with tabs[2]:
             if confirm_del_profile:
                 if st.button("❌ Delete profile", key=kp + "delete_profile"):
                     del profiles[prof_name]
-                    save_all_config(consoles, profiles, rare_items)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                     st.success("Profile deleted.")
                     st.rerun()
 
@@ -1643,7 +1666,7 @@ with tabs[4]:
                     "exclude_words": [x.strip().lower() for x in new_item_excl.split(",") if x.strip()],
                     "min_buy_total": float(new_min_buy),
                 }
-                save_all_config(consoles, profiles, rare_items)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                 st.success(f"Created rare item: {rid}")
                 st.rerun()
 
@@ -1685,7 +1708,7 @@ with tabs[4]:
 
         if st.button("Save rare item changes", key=kr + "save"):
             rare_items[rid] = copy.deepcopy(r)
-            save_all_config(consoles, profiles, rare_items)
+            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
             st.success("Rare item saved.")
 
         # Delete rare item
@@ -1694,6 +1717,287 @@ with tabs[4]:
         if confirm_del_rare:
             if st.button("❌ Delete rare item", key=kr + "delete"):
                 del rare_items[rid]
-                save_all_config(consoles, profiles, rare_items)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                 st.success("Rare item deleted.")
                 st.rerun()
+
+# -----------------------------
+# Workshop tab
+# -----------------------------
+with tabs[5]:
+    st.subheader("Workshop — Repair & Resell Tracker")
+
+    # ── Section 1: Add new job ──────────────────────────────────────────────
+    with st.expander("➕ Log new repair job", expanded=False):
+        wk_device = st.text_input("Device name (required)", value="", key="wk_add_device")
+        console_options = [""] + list(consoles.keys())
+        wk_console_id = st.selectbox(
+            "Link to product (optional)",
+            options=console_options,
+            format_func=lambda x: consoles[x]["name"] if x else "— none —",
+            key="wk_add_console_id",
+        )
+        wk_ebay_url = st.text_input("eBay listing URL", value="", key="wk_add_ebay_url")
+        wk_date_purchased = st.date_input(
+            "Date purchased",
+            value=datetime.now().date(),
+            key="wk_add_date_purchased",
+        )
+
+        colA, colB, colC = st.columns(3)
+        with colA:
+            wk_buy_price = st.number_input("Buy price (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_buy_price")
+            wk_parts_cost = st.number_input("Parts cost (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_parts_cost")
+        with colB:
+            wk_extra_costs = st.number_input("Extra costs (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_extra_costs")
+            wk_fee_rate_pct = st.number_input("Fee rate (%)", value=13.0, step=0.5, format="%.1f", key="wk_add_fee_rate")
+        with colC:
+            wk_ship_out = st.number_input("Postage out (£)", value=0.0, step=0.50, format="%.2f", key="wk_add_ship_out")
+            wk_packaging = st.number_input("Packaging (£)", value=0.0, step=0.50, format="%.2f", key="wk_add_packaging")
+
+        wk_notes = st.text_area("Notes", value="", key="wk_add_notes")
+
+        if st.button("Log job", key="wk_add_btn"):
+            if not wk_device.strip():
+                st.error("Please enter a device name.")
+            else:
+                job_id = next_console_id(workshop_jobs, wk_device.strip())
+                workshop_jobs[job_id] = {
+                    "device_name": wk_device.strip(),
+                    "console_id": wk_console_id,
+                    "ebay_url": wk_ebay_url.strip(),
+                    "buy_price": float(wk_buy_price),
+                    "parts_cost": float(wk_parts_cost),
+                    "extra_costs": float(wk_extra_costs),
+                    "notes": wk_notes.strip(),
+                    "date_purchased": wk_date_purchased.strftime("%Y-%m-%d"),
+                    "status": "in_progress",
+                    "sell_price": 0.0,
+                    "date_sold": "",
+                    "fee_rate": float(wk_fee_rate_pct) / 100.0,
+                    "ship_out": float(wk_ship_out),
+                    "packaging": float(wk_packaging),
+                }
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                st.success(f"Job logged: {job_id}")
+                st.rerun()
+
+    st.divider()
+
+    # ── Section 2: Active jobs (in_progress) ───────────────────────────────
+    st.markdown("### 🔧 Active Jobs (In Progress)")
+
+    in_progress = {
+        jid: j for jid, j in workshop_jobs.items() if j.get("status") == "in_progress"
+    }
+
+    if not in_progress:
+        st.info("No active jobs. Log one above.")
+    else:
+        # Build display table
+        ip_rows = []
+        for jid, j in in_progress.items():
+            linked = consoles.get(j.get("console_id", ""), {}).get("name", "—") if j.get("console_id") else "—"
+            total_costs = float(j.get("buy_price", 0.0)) + float(j.get("parts_cost", 0.0)) + float(j.get("extra_costs", 0.0))
+            ip_rows.append({
+                "job_id": jid,
+                "device_name": j.get("device_name", ""),
+                "product": linked,
+                "date_purchased": j.get("date_purchased", ""),
+                "buy_price": float(j.get("buy_price", 0.0)),
+                "parts_cost": float(j.get("parts_cost", 0.0)),
+                "extra_costs": float(j.get("extra_costs", 0.0)),
+                "total_costs": total_costs,
+                "notes": str(j.get("notes", ""))[:40],
+                "ebay_url": j.get("ebay_url", ""),
+            })
+        ip_rows.sort(key=lambda r: r["date_purchased"], reverse=True)
+        df_ip = pd.DataFrame(ip_rows)
+
+        st.dataframe(
+            df_ip.drop(columns=["job_id"]),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "buy_price": st.column_config.NumberColumn("Buy price", format="£%.2f"),
+                "parts_cost": st.column_config.NumberColumn("Parts cost", format="£%.2f"),
+                "extra_costs": st.column_config.NumberColumn("Extra costs", format="£%.2f"),
+                "total_costs": st.column_config.NumberColumn("Total costs", format="£%.2f"),
+                "ebay_url": st.column_config.LinkColumn("eBay listing", display_text="Open"),
+            },
+        )
+
+        st.markdown("#### Edit / Mark as Sold")
+        for jid in [r["job_id"] for r in ip_rows]:
+            j = copy.deepcopy(workshop_jobs[jid])
+            k = f"workshop::{jid}::"
+            label = j.get("device_name", jid)
+            with st.expander(f"✏️ {label}", expanded=False):
+                col1, col2 = st.columns(2)
+                with col1:
+                    j["device_name"] = st.text_input("Device name", value=j.get("device_name", ""), key=k + "device_name")
+                    console_opts = [""] + list(consoles.keys())
+                    cur_cid = j.get("console_id", "")
+                    cid_idx = console_opts.index(cur_cid) if cur_cid in console_opts else 0
+                    j["console_id"] = st.selectbox(
+                        "Link to product",
+                        options=console_opts,
+                        index=cid_idx,
+                        format_func=lambda x: consoles[x]["name"] if x else "— none —",
+                        key=k + "console_id",
+                    )
+                    j["ebay_url"] = st.text_input("eBay listing URL", value=j.get("ebay_url", ""), key=k + "ebay_url")
+                    _dp_str = j.get("date_purchased") or datetime.now().strftime("%Y-%m-%d")
+                    try:
+                        dp_default = datetime.strptime(_dp_str, "%Y-%m-%d").date()
+                    except Exception:
+                        dp_default = datetime.now().date()
+                    dp = st.date_input("Date purchased", value=dp_default, key=k + "date_purchased")
+                    j["date_purchased"] = dp.strftime("%Y-%m-%d")
+                with col2:
+                    j["buy_price"] = st.number_input("Buy price (£)", value=float(j.get("buy_price", 0.0)), step=1.0, format="%.2f", key=k + "buy_price")
+                    j["parts_cost"] = st.number_input("Parts cost (£)", value=float(j.get("parts_cost", 0.0)), step=1.0, format="%.2f", key=k + "parts_cost")
+                    j["extra_costs"] = st.number_input("Extra costs (£)", value=float(j.get("extra_costs", 0.0)), step=1.0, format="%.2f", key=k + "extra_costs")
+                    j["fee_rate"] = st.number_input("Fee rate (%)", value=float(j.get("fee_rate", 0.13)) * 100.0, step=0.5, format="%.1f", key=k + "fee_rate") / 100.0
+                    j["ship_out"] = st.number_input("Postage out (£)", value=float(j.get("ship_out", 0.0)), step=0.50, format="%.2f", key=k + "ship_out")
+                    j["packaging"] = st.number_input("Packaging (£)", value=float(j.get("packaging", 0.0)), step=0.50, format="%.2f", key=k + "packaging")
+                j["notes"] = st.text_area("Notes", value=j.get("notes", ""), key=k + "notes")
+
+                if st.button("💾 Save changes", key=k + "save"):
+                    workshop_jobs[jid] = copy.deepcopy(j)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    st.success("Job updated.")
+                    st.rerun()
+
+                st.markdown("**Mark as Sold**")
+                sell_col1, sell_col2 = st.columns(2)
+                with sell_col1:
+                    sold_price = st.number_input("Sell price (£)", value=0.0, step=1.0, format="%.2f", key=k + "sold_price")
+                with sell_col2:
+                    sold_date = st.date_input("Date sold", value=datetime.now().date(), key=k + "date_sold")
+
+                if st.button("✅ Mark as Sold", key=k + "mark_sold"):
+                    workshop_jobs[jid] = copy.deepcopy(j)
+                    workshop_jobs[jid]["status"] = "sold"
+                    workshop_jobs[jid]["sell_price"] = float(sold_price)
+                    workshop_jobs[jid]["date_sold"] = sold_date.strftime("%Y-%m-%d")
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    st.success("Job marked as sold.")
+                    st.rerun()
+
+                st.divider()
+                confirm_del = st.checkbox(f"Confirm delete job: {label}", key=k + "confirm_delete")
+                if confirm_del:
+                    if st.button("🗑️ Delete job", key=k + "delete"):
+                        del workshop_jobs[jid]
+                        save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                        st.success("Job deleted.")
+                        st.rerun()
+
+    st.divider()
+
+    # ── Section 3: Profit Sheet (Sold jobs) ────────────────────────────────
+    st.markdown("### 📊 Profit Sheet (Sold Jobs)")
+
+    sold_jobs = {jid: j for jid, j in workshop_jobs.items() if j.get("status") == "sold"}
+
+    if not sold_jobs:
+        st.info("No sold jobs yet.")
+    else:
+        sold_rows = []
+        for jid, j in sold_jobs.items():
+            linked = consoles.get(j.get("console_id", ""), {}).get("name", "—") if j.get("console_id") else "—"
+            buy_price = float(j.get("buy_price", 0.0))
+            parts_cost = float(j.get("parts_cost", 0.0))
+            extra_costs = float(j.get("extra_costs", 0.0))
+            total_costs = buy_price + parts_cost + extra_costs
+            sell_price = float(j.get("sell_price", 0.0))
+            fee_rate = float(j.get("fee_rate", 0.13))
+            ship_out = float(j.get("ship_out", 0.0))
+            packaging = float(j.get("packaging", 0.0))
+            fees = sell_price * fee_rate
+            net_revenue = sell_price * (1.0 - fee_rate) - ship_out - packaging
+            profit = net_revenue - total_costs
+            sold_rows.append({
+                "date_sold": j.get("date_sold", ""),
+                "device_name": j.get("device_name", ""),
+                "product": linked,
+                "buy_price": buy_price,
+                "parts_cost": parts_cost,
+                "extra_costs": extra_costs,
+                "total_costs": total_costs,
+                "sell_price": sell_price,
+                "fees": fees,
+                "ship_out": ship_out,
+                "packaging": packaging,
+                "net_revenue": net_revenue,
+                "profit": profit,
+                "notes": j.get("notes", ""),
+                "ebay_url": j.get("ebay_url", ""),
+            })
+        sold_rows.sort(key=lambda r: r["date_sold"], reverse=True)
+        df_sold = pd.DataFrame(sold_rows)
+
+        # Aggregate summary
+        total_jobs = len(df_sold)
+        total_revenue = float(df_sold["net_revenue"].sum())
+        total_costs_sum = float(df_sold["total_costs"].sum())
+        total_profit = float(df_sold["profit"].sum())
+
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.metric("Total jobs sold", total_jobs)
+        sc2.metric("Total net revenue", f"£{total_revenue:.2f}")
+        sc3.metric("Total costs", f"£{total_costs_sum:.2f}")
+        sc4.metric("Total profit", f"£{total_profit:.2f}")
+
+        st.dataframe(
+            df_sold,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "buy_price": st.column_config.NumberColumn("Buy price", format="£%.2f"),
+                "parts_cost": st.column_config.NumberColumn("Parts cost", format="£%.2f"),
+                "extra_costs": st.column_config.NumberColumn("Extra costs", format="£%.2f"),
+                "total_costs": st.column_config.NumberColumn("Total costs", format="£%.2f"),
+                "sell_price": st.column_config.NumberColumn("Sell price", format="£%.2f"),
+                "fees": st.column_config.NumberColumn("Fees", format="£%.2f"),
+                "ship_out": st.column_config.NumberColumn("Ship out", format="£%.2f"),
+                "packaging": st.column_config.NumberColumn("Packaging", format="£%.2f"),
+                "net_revenue": st.column_config.NumberColumn("Net revenue", format="£%.2f"),
+                "profit": st.column_config.NumberColumn("Profit", format="£%.2f"),
+                "ebay_url": st.column_config.LinkColumn("eBay listing", display_text="Open"),
+            },
+        )
+
+        csv_bytes_workshop = df_sold.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download profit sheet CSV",
+            data=csv_bytes_workshop,
+            file_name="dealfinder_workshop.csv",
+            mime="text/csv",
+            key="download_workshop_csv_btn",
+        )
+
+        # Per-product summary
+        st.markdown("#### Per-product summary")
+        df_by_product = (
+            df_sold.groupby("product")
+            .agg(
+                jobs=("profit", "count"),
+                total_costs=("total_costs", "sum"),
+                total_net_revenue=("net_revenue", "sum"),
+                total_profit=("profit", "sum"),
+            )
+            .reset_index()
+            .sort_values("total_profit", ascending=False)
+        )
+        st.dataframe(
+            df_by_product,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "total_costs": st.column_config.NumberColumn("Total costs", format="£%.2f"),
+                "total_net_revenue": st.column_config.NumberColumn("Total net revenue", format="£%.2f"),
+                "total_profit": st.column_config.NumberColumn("Total profit", format="£%.2f"),
+            },
+        )
