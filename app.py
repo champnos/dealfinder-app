@@ -376,6 +376,12 @@ def load_config() -> Dict[str, Any]:
             j.setdefault("packaging", 0.0)
             j.setdefault("expected_sell_price", 0.0)
 
+        # Backfill expected_sell_price from linked console when not yet set
+        for _, j in cfg["workshop_jobs"].items():
+            if not j.get("expected_sell_price") and j.get("console_id"):
+                linked = cfg["consoles"].get(j["console_id"], {})
+                j["expected_sell_price"] = float(linked.get("default_sell_price") or 0.0)
+
         return cfg
     except Exception:
         cfg = {"consoles": {}, "profiles": {}, "rare_items": {}}
