@@ -1902,11 +1902,14 @@ with tabs[5]:
 
                 _stored_esp = float(j.get("expected_sell_price") or 0.0)
                 _esp_default = _stored_esp if _stored_esp > 0 else float(_console_sell or 0.0)
+                _esp_key = k + "expected_sell_price"
+                if _esp_default > 0 and float(st.session_state.get(_esp_key) or 0.0) <= 0:
+                    st.session_state[_esp_key] = _esp_default
                 j["expected_sell_price"] = st.number_input(
                     "Expected sell price (£)",
                     value=_esp_default,
                     step=1.0, format="%.2f",
-                    key=k + "expected_sell_price",
+                    key=_esp_key,
                     help="Pre-filled from linked product. Edit to override.",
                 )
 
