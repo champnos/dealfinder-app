@@ -374,6 +374,7 @@ def load_config() -> Dict[str, Any]:
             j.setdefault("fee_rate", 0.13)
             j.setdefault("ship_out", 0.0)
             j.setdefault("packaging", 0.0)
+            j.setdefault("expected_sell_price", 0.0)
 
         return cfg
     except Exception:
@@ -1744,16 +1745,35 @@ with tabs[5]:
             key="wk_add_date_purchased",
         )
 
+        _add_linked_c = consoles.get(wk_console_id, {}) if wk_console_id else {}
+        _add_default_sell = float(_add_linked_c.get("default_sell_price", 0.0))
+        _add_default_fee = float(_add_linked_c.get("fee_rate", 0.13)) * 100.0 if _add_linked_c else 13.0
+        _add_default_ship = float(_add_linked_c.get("ship_out", 0.0))
+        _add_default_pack = float(_add_linked_c.get("packaging", 0.0))
+
+        wk_expected_sell_price = st.number_input(
+            "Expected sell price (£)",
+            value=_add_default_sell,
+            step=1.0, format="%.2f",
+            key="wk_add_expected_sell_price",
+            help="Pre-filled from linked product. Edit to override.",
+        )
+
         colA, colB, colC = st.columns(3)
         with colA:
             wk_buy_price = st.number_input("Buy price (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_buy_price")
             wk_parts_cost = st.number_input("Parts cost (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_parts_cost")
         with colB:
             wk_extra_costs = st.number_input("Extra costs (£)", value=0.0, step=1.0, format="%.2f", key="wk_add_extra_costs")
-            wk_fee_rate_pct = st.number_input("Fee rate (%)", value=13.0, step=0.5, format="%.1f", key="wk_add_fee_rate")
+            wk_fee_rate_pct = st.number_input("Fee rate (%)", value=_add_default_fee, step=0.5, format="%.1f", key="wk_add_fee_rate")
         with colC:
-            wk_ship_out = st.number_input("Postage out (£)", value=0.0, step=0.50, format="%.2f", key="wk_add_ship_out")
-            wk_packaging = st.number_input("Packaging (£)", value=0.0, step=0.50, format="%.2f", key="wk_add_packaging")
+            wk_ship_out = st.number_input("Postage out (£)", value=_add_default_ship, step=0.50, format="%.2f", key="wk_add_ship_out")
+            wk_packaging = st.number_input("Packaging (£)", value=_add_default_pack, step=0.50, format="%.2f", key="wk_add_packaging")
+
+        _add_nr = float(wk_expected_sell_price) * (1 - float(wk_fee_rate_pct) / 100.0) - float(wk_ship_out) - float(wk_packaging)
+        _add_tc = float(wk_buy_price) + float(wk_parts_cost) + float(wk_extra_costs)
+        _add_ep = _add_nr - _add_tc
+        st.info(f"💡 Est. profit at these costs: £{_add_ep:.2f}")
 
         wk_notes = st.text_area("Notes", value="", key="wk_add_notes")
 
@@ -1777,6 +1797,7 @@ with tabs[5]:
                     "fee_rate": float(wk_fee_rate_pct) / 100.0,
                     "ship_out": float(wk_ship_out),
                     "packaging": float(wk_packaging),
+                    "expected_sell_price": float(wk_expected_sell_price),
                 }
                 save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
                 st.success(f"Job logged: {job_id}")
@@ -1799,6 +1820,12 @@ with tabs[5]:
         for jid, j in in_progress.items():
             linked = consoles.get(j.get("console_id", ""), {}).get("name", "—") if j.get("console_id") else "—"
             total_costs = float(j.get("buy_price", 0.0)) + float(j.get("parts_cost", 0.0)) + float(j.get("extra_costs", 0.0))
+            _esp = float(j.get("expected_sell_price", 0.0))
+            _fr = float(j.get("fee_rate", 0.13))
+            _so = float(j.get("ship_out", 0.0))
+            _pk = float(j.get("packaging", 0.0))
+            _nr = _esp * (1.0 - _fr) - _so - _pk
+            _ep = _nr - total_costs
             ip_rows.append({
                 "job_id": jid,
                 "device_name": j.get("device_name", ""),
@@ -1808,6 +1835,8 @@ with tabs[5]:
                 "parts_cost": float(j.get("parts_cost", 0.0)),
                 "extra_costs": float(j.get("extra_costs", 0.0)),
                 "total_costs": total_costs,
+                "expected_sell_price": _esp,
+                "est_profit": _ep,
                 "notes": str(j.get("notes", ""))[:40],
                 "ebay_url": j.get("ebay_url", ""),
             })
@@ -1823,6 +1852,8 @@ with tabs[5]:
                 "parts_cost": st.column_config.NumberColumn("Parts cost", format="£%.2f"),
                 "extra_costs": st.column_config.NumberColumn("Extra costs", format="£%.2f"),
                 "total_costs": st.column_config.NumberColumn("Total costs", format="£%.2f"),
+                "expected_sell_price": st.column_config.NumberColumn("Exp. sell", format="£%.2f"),
+                "est_profit": st.column_config.NumberColumn("Est. profit", format="£%.2f"),
                 "ebay_url": st.column_config.LinkColumn("eBay listing", display_text="Open"),
             },
         )
@@ -1855,13 +1886,41 @@ with tabs[5]:
                     dp = st.date_input("Date purchased", value=dp_default, key=k + "date_purchased")
                     j["date_purchased"] = dp.strftime("%Y-%m-%d")
                 with col2:
+                    _linked_c = consoles.get(j.get("console_id", ""), {}) if j.get("console_id") else {}
+                    _console_sell = float(_linked_c.get("default_sell_price", 0.0))
+                    _console_fee = float(_linked_c.get("fee_rate", 0.13))
+                    _console_ship = float(_linked_c.get("ship_out", 0.0))
+                    _console_pack = float(_linked_c.get("packaging", 0.0))
                     j["buy_price"] = st.number_input("Buy price (£)", value=float(j.get("buy_price", 0.0)), step=1.0, format="%.2f", key=k + "buy_price")
                     j["parts_cost"] = st.number_input("Parts cost (£)", value=float(j.get("parts_cost", 0.0)), step=1.0, format="%.2f", key=k + "parts_cost")
                     j["extra_costs"] = st.number_input("Extra costs (£)", value=float(j.get("extra_costs", 0.0)), step=1.0, format="%.2f", key=k + "extra_costs")
-                    j["fee_rate"] = st.number_input("Fee rate (%)", value=float(j.get("fee_rate", 0.13)) * 100.0, step=0.5, format="%.1f", key=k + "fee_rate") / 100.0
-                    j["ship_out"] = st.number_input("Postage out (£)", value=float(j.get("ship_out", 0.0)), step=0.50, format="%.2f", key=k + "ship_out")
-                    j["packaging"] = st.number_input("Packaging (£)", value=float(j.get("packaging", 0.0)), step=0.50, format="%.2f", key=k + "packaging")
+                    j["fee_rate"] = st.number_input("Fee rate (%)", value=float(j.get("fee_rate", _console_fee)) * 100.0, step=0.5, format="%.1f", key=k + "fee_rate") / 100.0
+                    _stored_ship = float(j.get("ship_out", 0.0))
+                    _stored_pack = float(j.get("packaging", 0.0))
+                    j["ship_out"] = st.number_input("Postage out (£)", value=_stored_ship if _stored_ship > 0 else _console_ship, step=0.50, format="%.2f", key=k + "ship_out")
+                    j["packaging"] = st.number_input("Packaging (£)", value=_stored_pack if _stored_pack > 0 else _console_pack, step=0.50, format="%.2f", key=k + "packaging")
+
+                _esp_default = float(j["expected_sell_price"] if j.get("expected_sell_price") is not None else (_console_sell or 0.0))
+                j["expected_sell_price"] = st.number_input(
+                    "Expected sell price (£)",
+                    value=_esp_default,
+                    step=1.0, format="%.2f",
+                    key=k + "expected_sell_price",
+                    help="Pre-filled from linked product. Edit to override.",
+                )
+
                 j["notes"] = st.text_area("Notes", value=j.get("notes", ""), key=k + "notes")
+
+                _esp = float(j.get("expected_sell_price", 0.0))
+                _fr = float(j.get("fee_rate", 0.13))
+                _so = float(j.get("ship_out", 0.0))
+                _pk = float(j.get("packaging", 0.0))
+                _tc = float(j.get("buy_price", 0.0)) + float(j.get("parts_cost", 0.0)) + float(j.get("extra_costs", 0.0))
+                _nr = _esp * (1.0 - _fr) - _so - _pk
+                _ep = _nr - _tc
+                if _esp > 0:
+                    _colour = "🟢" if _ep >= 0 else "🔴"
+                    st.info(f"{_colour} Prospective profit at £{_esp:.2f} sell: **£{_ep:.2f}** (net rev £{_nr:.2f} − costs £{_tc:.2f})")
 
                 if st.button("💾 Save changes", key=k + "save"):
                     workshop_jobs[jid] = copy.deepcopy(j)
@@ -1872,7 +1931,7 @@ with tabs[5]:
                 st.markdown("**Mark as Sold**")
                 sell_col1, sell_col2 = st.columns(2)
                 with sell_col1:
-                    sold_price = st.number_input("Sell price (£)", value=0.0, step=1.0, format="%.2f", key=k + "sold_price")
+                    sold_price = st.number_input("Sell price (£)", value=float(j.get("expected_sell_price", 0.0)), step=1.0, format="%.2f", key=k + "sold_price")
                 with sell_col2:
                     sold_date = st.date_input("Date sold", value=datetime.now().date(), key=k + "date_sold")
 
