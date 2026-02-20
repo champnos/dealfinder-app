@@ -259,6 +259,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
     merged.setdefault("profiles", {})
     merged.setdefault("rare_items", {})
     merged.setdefault("workshop_jobs", {})
+    merged.setdefault("rare_finds", {})
 
     # Backup current config before overwrite
     try:
@@ -275,7 +276,7 @@ def save_config(cfg: Dict[str, Any]) -> None:
     os.replace(tmp_path, CONFIG_PATH)
 
 
-def save_all_config(consoles: Dict[str, Any], profiles: Dict[str, Any], rare_items: Dict[str, Any], workshop_jobs: Dict[str, Any] = None) -> None:
+def save_all_config(consoles: Dict[str, Any], profiles: Dict[str, Any], rare_items: Dict[str, Any], workshop_jobs: Dict[str, Any] = None, rare_finds: Dict[str, Any] = None) -> None:
     """Save full config using current in-memory sections, via safe save_config."""
     cfg = load_config()
     cfg["consoles"] = consoles
@@ -283,6 +284,8 @@ def save_all_config(consoles: Dict[str, Any], profiles: Dict[str, Any], rare_ite
     cfg["rare_items"] = rare_items
     if workshop_jobs is not None:
         cfg["workshop_jobs"] = workshop_jobs
+    if rare_finds is not None:
+        cfg["rare_finds"] = rare_finds
     save_config(cfg)
 
 
@@ -386,6 +389,23 @@ def load_config() -> Dict[str, Any]:
                     j["ship_out"] = float(linked.get("ship_out") or 0.0)
                 if not j.get("packaging"):
                     j["packaging"] = float(linked.get("packaging") or 0.0)
+
+        # Backfill/normalize expected fields (rare finds)
+        cfg.setdefault("rare_finds", {})
+        for _, j in cfg["rare_finds"].items():
+            j.setdefault("item_name", "Item")
+            j.setdefault("ebay_buy_url", "")
+            j.setdefault("buy_price", 0.0)
+            j.setdefault("date_purchased", "")
+            j.setdefault("condition", "")
+            j.setdefault("expected_sell_price", 0.0)
+            j.setdefault("fee_rate", 0.13)
+            j.setdefault("ship_out", 0.0)
+            j.setdefault("packaging", 0.0)
+            j.setdefault("notes", "")
+            j.setdefault("status", "in_stock")
+            j.setdefault("sell_price", 0.0)
+            j.setdefault("date_sold", "")
 
         return cfg
     except Exception:
@@ -1009,6 +1029,7 @@ consoles: Dict[str, Any] = cfg["consoles"]
 profiles: Dict[str, Any] = cfg["profiles"]
 rare_items: Dict[str, Any] = cfg.get("rare_items", {})
 workshop_jobs: Dict[str, Any] = cfg.get("workshop_jobs", {})
+rare_finds: Dict[str, Any] = cfg.get("rare_finds", {})
 
 COMMON_CONDITIONS = [
     "New",
@@ -1234,7 +1255,7 @@ with st.sidebar:
         on_change=lambda: persist_ui_key("selected_rare_items_sidebar"),
     )
 
-tabs = st.tabs(["Scan", "Products", "Profiles", "Rare Scan", "Rare Items", "Workshop"])
+tabs = st.tabs(["Scan", "Products", "Profiles", "Rare Scan", "Rare Items", "Workshop", "Rare Finds"])
 
 # -----------------------------
 # Scan tab
@@ -1382,7 +1403,7 @@ with tabs[1]:
                     "min_buy_total": float(new_min_buy),
                     "exclude_words": [x.strip().lower() for x in new_excl.split(",") if x.strip()],
                 }
-                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                 st.success(f"Created console: {cid}")
                 st.rerun()
 
@@ -1419,7 +1440,7 @@ with tabs[1]:
 
         if st.button("Save product changes", key=k + "save"):
             consoles[console_id] = copy.deepcopy(c)
-            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
             st.success("Product saved.")
 
         # Delete Product (safe)
@@ -1442,7 +1463,7 @@ with tabs[1]:
             if confirm_del_console:
                 if st.button("❌ Delete product", key=k + "delete_console"):
                     del consoles[console_id]
-                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                     st.success("Product deleted.")
                     st.rerun()
 
@@ -1486,7 +1507,7 @@ with tabs[2]:
                         "target_profit": float(new_target),
                         "sell_price_override": None if float(new_override) <= 0 else float(new_override),
                     }
-                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                     st.success("Profile created.")
                     st.rerun()
 
@@ -1530,7 +1551,7 @@ with tabs[2]:
 
             if st.button("Save profile changes", key=kp + "save"):
                 profiles[prof_name] = copy.deepcopy(p)
-                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                 st.success("Profile saved.")
 
             # Delete Profile
@@ -1542,7 +1563,7 @@ with tabs[2]:
             if confirm_del_profile:
                 if st.button("❌ Delete profile", key=kp + "delete_profile"):
                     del profiles[prof_name]
-                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                     st.success("Profile deleted.")
                     st.rerun()
 
@@ -1678,7 +1699,7 @@ with tabs[4]:
                     "exclude_words": [x.strip().lower() for x in new_item_excl.split(",") if x.strip()],
                     "min_buy_total": float(new_min_buy),
                 }
-                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                 st.success(f"Created rare item: {rid}")
                 st.rerun()
 
@@ -1720,7 +1741,7 @@ with tabs[4]:
 
         if st.button("Save rare item changes", key=kr + "save"):
             rare_items[rid] = copy.deepcopy(r)
-            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+            save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
             st.success("Rare item saved.")
 
         # Delete rare item
@@ -1729,7 +1750,7 @@ with tabs[4]:
         if confirm_del_rare:
             if st.button("❌ Delete rare item", key=kr + "delete"):
                 del rare_items[rid]
-                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                 st.success("Rare item deleted.")
                 st.rerun()
 
@@ -1810,7 +1831,7 @@ with tabs[5]:
                     "packaging": float(wk_packaging),
                     "expected_sell_price": float(wk_expected_sell_price),
                 }
-                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                 st.success(f"Job logged: {job_id}")
                 st.rerun()
 
@@ -1947,7 +1968,7 @@ with tabs[5]:
 
                 if st.button("💾 Save changes", key=k + "save"):
                     workshop_jobs[jid] = copy.deepcopy(j)
-                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                     st.success("Job updated.")
                     st.rerun()
 
@@ -1963,7 +1984,7 @@ with tabs[5]:
                     workshop_jobs[jid]["status"] = "sold"
                     workshop_jobs[jid]["sell_price"] = float(sold_price)
                     workshop_jobs[jid]["date_sold"] = sold_date.strftime("%Y-%m-%d")
-                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                     st.success("Job marked as sold.")
                     st.rerun()
 
@@ -1972,7 +1993,7 @@ with tabs[5]:
                 if confirm_del:
                     if st.button("🗑️ Delete job", key=k + "delete"):
                         del workshop_jobs[jid]
-                        save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs)
+                        save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
                         st.success("Job deleted.")
                         st.rerun()
 
@@ -2081,5 +2102,253 @@ with tabs[5]:
                 "total_costs": st.column_config.NumberColumn("Total costs", format="£%.2f"),
                 "total_net_revenue": st.column_config.NumberColumn("Total net revenue", format="£%.2f"),
                 "total_profit": st.column_config.NumberColumn("Total profit", format="£%.2f"),
+            },
+        )
+
+with tabs[6]:
+    st.subheader("Rare Finds — Buy Cheap, Relist at Market Value")
+
+    # ── Section 1: Log new rare find ──────────────────────────────────────
+    with st.expander("➕ Log new rare find", expanded=False):
+        rf_item_name = st.text_input("Item name (required)", value="", key="rf_add_item_name")
+        rf_ebay_buy_url = st.text_input("eBay listing URL (bought from)", value="", key="rf_add_ebay_buy_url")
+        rf_date_purchased = st.date_input(
+            "Date purchased",
+            value=datetime.now().date(),
+            key="rf_add_date_purchased",
+        )
+        rf_condition = st.selectbox(
+            "Condition",
+            options=["CIB", "Loose", "Sealed", "Box Only", "Manual Only", "Other"],
+            key="rf_add_condition",
+        )
+        rf_expected_sell_price = st.number_input(
+            "Expected sell price (£)",
+            value=0.0,
+            step=1.0, format="%.2f",
+            key="rf_add_expected_sell_price",
+        )
+
+        rfcA, rfcB, rfcC = st.columns(3)
+        with rfcA:
+            rf_fee_rate_pct = st.number_input("Fee rate (%)", value=13.0, step=0.5, format="%.1f", key="rf_add_fee_rate")
+        with rfcB:
+            rf_ship_out = st.number_input("Ship out (£)", value=0.0, step=0.50, format="%.2f", key="rf_add_ship_out")
+        with rfcC:
+            rf_packaging = st.number_input("Packaging (£)", value=0.0, step=0.50, format="%.2f", key="rf_add_packaging")
+
+        rf_buy_price = st.number_input("Buy price (£)", value=0.0, step=1.0, format="%.2f", key="rf_add_buy_price")
+
+        _rf_add_ep = float(rf_expected_sell_price) * (1.0 - float(rf_fee_rate_pct) / 100.0) - float(rf_ship_out) - float(rf_packaging) - float(rf_buy_price)
+        st.info(f"💡 Est. profit: £{_rf_add_ep:.2f}")
+
+        rf_notes = st.text_area("Notes", value="", key="rf_add_notes")
+
+        if st.button("Log find", key="rf_add_btn"):
+            if not rf_item_name.strip():
+                st.error("Please enter an item name.")
+            else:
+                rf_find_id = next_console_id(rare_finds, rf_item_name.strip())
+                rare_finds[rf_find_id] = {
+                    "item_name": rf_item_name.strip(),
+                    "ebay_buy_url": rf_ebay_buy_url.strip(),
+                    "buy_price": float(rf_buy_price),
+                    "date_purchased": rf_date_purchased.strftime("%Y-%m-%d"),
+                    "condition": rf_condition,
+                    "expected_sell_price": float(rf_expected_sell_price),
+                    "fee_rate": float(rf_fee_rate_pct) / 100.0,
+                    "ship_out": float(rf_ship_out),
+                    "packaging": float(rf_packaging),
+                    "notes": rf_notes.strip(),
+                    "status": "in_stock",
+                    "sell_price": 0.0,
+                    "date_sold": "",
+                }
+                save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
+                st.success(f"Find logged: {rf_find_id}")
+                st.rerun()
+
+    st.divider()
+
+    # ── Section 2: Active finds (in_stock + listed) ───────────────────────
+    st.markdown("### 📦 Active Finds (In Stock / Listed)")
+
+    active_finds = {
+        fid: f for fid, f in rare_finds.items() if f.get("status") in ("in_stock", "listed")
+    }
+
+    if not active_finds:
+        st.info("No active finds. Log one above.")
+    else:
+        af_rows = []
+        for fid, f in active_finds.items():
+            _esp = float(f.get("expected_sell_price", 0.0))
+            _fr = float(f.get("fee_rate", 0.13))
+            _so = float(f.get("ship_out", 0.0))
+            _pk = float(f.get("packaging", 0.0))
+            _bp = float(f.get("buy_price", 0.0))
+            _ep = _esp * (1.0 - _fr) - _so - _pk - _bp
+            af_rows.append({
+                "find_id": fid,
+                "item_name": f.get("item_name", ""),
+                "condition": f.get("condition", ""),
+                "date_purchased": f.get("date_purchased", ""),
+                "buy_price": _bp,
+                "expected_sell_price": _esp,
+                "est_profit": _ep,
+                "status": f.get("status", ""),
+                "notes": str(f.get("notes", ""))[:40],
+                "ebay_buy_url": f.get("ebay_buy_url", ""),
+            })
+        af_rows.sort(key=lambda r: r["date_purchased"], reverse=True)
+        df_af = pd.DataFrame(af_rows)
+
+        st.dataframe(
+            df_af.drop(columns=["find_id"]),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "buy_price": st.column_config.NumberColumn("Buy price", format="£%.2f"),
+                "expected_sell_price": st.column_config.NumberColumn("Exp. sell", format="£%.2f"),
+                "est_profit": st.column_config.NumberColumn("Est. profit", format="£%.2f"),
+                "ebay_buy_url": st.column_config.LinkColumn("eBay listing", display_text="Open"),
+            },
+        )
+
+        st.markdown("#### Edit / Mark as Sold")
+        for fid in [r["find_id"] for r in af_rows]:
+            f = copy.deepcopy(rare_finds[fid])
+            rk = f"rarefind::{fid}::"
+            label = f.get("item_name", fid)
+            with st.expander(f"✏️ {label}", expanded=False):
+                f["item_name"] = st.text_input("Item name", value=f.get("item_name", ""), key=rk + "item_name")
+                f["ebay_buy_url"] = st.text_input("eBay listing URL", value=f.get("ebay_buy_url", ""), key=rk + "ebay_buy_url")
+                _rf_dp_str = f.get("date_purchased") or datetime.now().strftime("%Y-%m-%d")
+                try:
+                    _rf_dp_default = datetime.strptime(_rf_dp_str, "%Y-%m-%d").date()
+                except Exception:
+                    _rf_dp_default = datetime.now().date()
+                rf_dp = st.date_input("Date purchased", value=_rf_dp_default, key=rk + "date_purchased")
+                f["date_purchased"] = rf_dp.strftime("%Y-%m-%d")
+
+                _cond_options = ["CIB", "Loose", "Sealed", "Box Only", "Manual Only", "Other"]
+                _cond_cur = f.get("condition", "CIB")
+                _cond_idx = _cond_options.index(_cond_cur) if _cond_cur in _cond_options else 0
+                f["condition"] = st.selectbox("Condition", options=_cond_options, index=_cond_idx, key=rk + "condition")
+
+                f["expected_sell_price"] = st.number_input(
+                    "Expected sell price (£)",
+                    value=float(f.get("expected_sell_price", 0.0)),
+                    step=1.0, format="%.2f",
+                    key=rk + "expected_sell_price",
+                )
+
+                rfc1, rfc2, rfc3 = st.columns(3)
+                with rfc1:
+                    f["fee_rate"] = st.number_input("Fee rate (%)", value=float(f.get("fee_rate", 0.13)) * 100.0, step=0.5, format="%.1f", key=rk + "fee_rate") / 100.0
+                with rfc2:
+                    f["ship_out"] = st.number_input("Ship out (£)", value=float(f.get("ship_out", 0.0)), step=0.50, format="%.2f", key=rk + "ship_out")
+                with rfc3:
+                    f["packaging"] = st.number_input("Packaging (£)", value=float(f.get("packaging", 0.0)), step=0.50, format="%.2f", key=rk + "packaging")
+
+                f["buy_price"] = st.number_input("Buy price (£)", value=float(f.get("buy_price", 0.0)), step=1.0, format="%.2f", key=rk + "buy_price")
+
+                _status_options = ["in_stock", "listed", "sold"]
+                _status_cur = f.get("status", "in_stock")
+                _status_idx = _status_options.index(_status_cur) if _status_cur in _status_options else 0
+                f["status"] = st.selectbox("Status", options=_status_options, index=_status_idx, key=rk + "status")
+
+                _rf_esp = float(f.get("expected_sell_price", 0.0))
+                _rf_fr = float(f.get("fee_rate", 0.13))
+                _rf_so = float(f.get("ship_out", 0.0))
+                _rf_pk = float(f.get("packaging", 0.0))
+                _rf_bp = float(f.get("buy_price", 0.0))
+                _rf_ep = _rf_esp * (1.0 - _rf_fr) - _rf_so - _rf_pk - _rf_bp
+                st.info(f"💡 Est. profit: £{_rf_ep:.2f}")
+
+                f["notes"] = st.text_area("Notes", value=f.get("notes", ""), key=rk + "notes")
+
+                if st.button("💾 Save changes", key=rk + "save"):
+                    rare_finds[fid] = copy.deepcopy(f)
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
+                    st.success("Find updated.")
+                    st.rerun()
+
+                st.markdown("**✅ Mark as Sold**")
+                rf_sell_col1, rf_sell_col2 = st.columns(2)
+                with rf_sell_col1:
+                    rf_sold_price = st.number_input("Sell price (£)", value=float(f.get("expected_sell_price", 0.0)), step=1.0, format="%.2f", key=rk + "sold_price")
+                with rf_sell_col2:
+                    rf_sold_date = st.date_input("Date sold", value=datetime.now().date(), key=rk + "date_sold")
+
+                if st.button("✅ Mark as Sold", key=rk + "mark_sold"):
+                    rare_finds[fid] = copy.deepcopy(f)
+                    rare_finds[fid]["status"] = "sold"
+                    rare_finds[fid]["sell_price"] = float(rf_sold_price)
+                    rare_finds[fid]["date_sold"] = rf_sold_date.strftime("%Y-%m-%d")
+                    save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
+                    st.success("Find marked as sold.")
+                    st.rerun()
+
+                st.divider()
+                rf_confirm_del = st.checkbox(f"Confirm delete find: {label}", key=rk + "confirm_delete")
+                if rf_confirm_del:
+                    if st.button("🗑️ Delete find", key=rk + "delete"):
+                        del rare_finds[fid]
+                        save_all_config(consoles, profiles, rare_items, workshop_jobs=workshop_jobs, rare_finds=rare_finds)
+                        st.success("Find deleted.")
+                        st.rerun()
+
+    st.divider()
+
+    # ── Section 3: Profit Sheet (sold finds) ─────────────────────────────
+    st.markdown("### 📊 Profit Sheet (Sold Finds)")
+
+    sold_finds = {fid: f for fid, f in rare_finds.items() if f.get("status") == "sold"}
+
+    if not sold_finds:
+        st.info("No sold finds yet.")
+    else:
+        sf_rows = []
+        for fid, f in sold_finds.items():
+            buy_price = float(f.get("buy_price", 0.0))
+            sell_price = float(f.get("sell_price", 0.0))
+            fee_rate = float(f.get("fee_rate", 0.13))
+            ship_out = float(f.get("ship_out", 0.0))
+            packaging = float(f.get("packaging", 0.0))
+            net_revenue = sell_price * (1.0 - fee_rate) - ship_out - packaging
+            actual_profit = net_revenue - buy_price
+            sf_rows.append({
+                "date_purchased": f.get("date_purchased", ""),
+                "item_name": f.get("item_name", ""),
+                "condition": f.get("condition", ""),
+                "buy_price": buy_price,
+                "sell_price": sell_price,
+                "net_revenue": net_revenue,
+                "actual_profit": actual_profit,
+                "date_sold": f.get("date_sold", ""),
+                "notes": f.get("notes", ""),
+            })
+        sf_rows.sort(key=lambda r: r["date_sold"], reverse=True)
+        df_sf = pd.DataFrame(sf_rows)
+
+        total_sf_sold = len(df_sf)
+        total_sf_profit = float(df_sf["actual_profit"].sum())
+        avg_sf_profit = total_sf_profit / total_sf_sold if total_sf_sold > 0 else 0.0
+
+        sfc1, sfc2, sfc3 = st.columns(3)
+        sfc1.metric("Total sold", total_sf_sold)
+        sfc2.metric("Total profit", f"£{total_sf_profit:.2f}")
+        sfc3.metric("Avg profit per find", f"£{avg_sf_profit:.2f}")
+
+        st.dataframe(
+            df_sf,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "buy_price": st.column_config.NumberColumn("Buy price", format="£%.2f"),
+                "sell_price": st.column_config.NumberColumn("Sell price", format="£%.2f"),
+                "net_revenue": st.column_config.NumberColumn("Net revenue", format="£%.2f"),
+                "actual_profit": st.column_config.NumberColumn("Actual profit", format="£%.2f"),
             },
         )
