@@ -177,7 +177,7 @@ def get_app_token(client_id: str, client_secret: str) -> str:
     return r.json()["access_token"]
 
 
-def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) -> List[Dict[str, Any]]:
+def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str, category_id: str = "") -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     items = []
 
@@ -192,6 +192,8 @@ def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) 
 
     if mode in ("bin", "both"):
         params = {"q": q, "limit": min(limit, 200), "filter": "buyingOptions:{FIXED_PRICE}"}
+        if category_id:
+            params["category_ids"] = category_id
         items += _get(params)
 
     if mode in ("auctions_ending", "both"):
@@ -200,6 +202,8 @@ def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) 
             "limit": min(limit, 200),
             "filter": "buyingOptions:{AUCTION}",
         }
+        if category_id:
+            params["category_ids"] = category_id
         items += _get(params)
 
     # de-dupe within scan by itemId (stable)
@@ -433,6 +437,79 @@ def main():
 
     save_notified_ids(notified_ids)
     print(f"[scanner] Done. checked={checked}, alerts_sent={sent}, notified_total={len(notified_ids)}")
+
+    # ── Rare items scan ─────────────────────────────────────────────────────
+    rare_items = cfg.get("rare_items", {})
+    for item_id, r in rare_items.items():
+        query = str(r.get("search_query", "")).strip() or str(r.get("name", "")).strip()
+        if not query:
+            continue
+
+        category_id = str(r.get("category_id", "")).strip()
+        sell_price = float(r.get("sell_price", 0.0))
+        fee_rate = float(r.get("fee_rate", 0.13))
+        ship_out = float(r.get("ship_out", 0.0))
+        packaging = float(r.get("packaging", 0.0))
+        extra_costs = float(r.get("extra_costs", 0.0))
+        target_profit = float(r.get("target_profit", 0.0))
+        min_buy_total = float(r.get("min_buy_total", 0.0))
+
+        must_any = _norm_words_csv(r.get("must_include_any", []))
+        excl_words = _norm_words_csv(r.get("exclude_words", []))
+
+        mx_buy = sell_price * (1.0 - fee_rate) - ship_out - packaging - extra_costs - target_profit
+        net_before_buy = sell_price * (1.0 - fee_rate) - ship_out - packaging - extra_costs
+
+        rare_items_raw = search_live(token, marketplace, query, PER_PROFILE_LIMIT, SCAN_MODE, category_id)
+
+        for it in rare_items_raw:
+            it_id = ebay_item_id(it)
+            if not it_id or it_id in notified_ids:
+                continue
+
+            title = it.get("title") or ""
+            if not _passes_word_filters(title, must_any, excl_words):
+                continue
+
+            price_val = (it.get("price") or {}).get("value")
+            if price_val is None:
+                continue
+            price = float(price_val)
+            try:
+                ship_in = float((it.get("shippingOptions") or [{}])[0].get("shippingCost", {}).get("value", 0.0))
+            except Exception:
+                ship_in = 0.0
+            buy_total = price + ship_in
+
+            if buy_total <= 0 or buy_total < min_buy_total:
+                continue
+
+            checked += 1
+
+            if ONLY_BELOW_MAXBUY and buy_total > mx_buy:
+                continue
+
+            est_profit = net_before_buy - buy_total
+            offer_txt = "Yes" if detect_make_offer(it) else "No"
+            url = it.get("itemWebUrl", "")
+
+            msg = (
+                f"✅ DealFinder: RARE ITEM FOUND\n"
+                f"{r.get('name', item_id)}\n"
+                f"Buy total: £{buy_total:.2f}\n"
+                f"Est profit: £{est_profit:.2f}\n"
+                f"Make offer: {offer_txt}\n"
+                f"{title}\n"
+                f"{url}"
+            )
+
+            ok, _info = telegram_send(tg_token, tg_chat, msg)
+            if ok:
+                notified_ids.add(it_id)
+                sent += 1
+
+    save_notified_ids(notified_ids)
+    print(f"[scanner] Rare scan done. checked={checked}, alerts_sent={sent}, notified_total={len(notified_ids)}")
 
 if __name__ == "__main__":
     main()

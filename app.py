@@ -355,6 +355,7 @@ def load_config() -> Dict[str, Any]:
             r.setdefault("must_include_any", [])
             r.setdefault("exclude_words", [])
             r.setdefault("min_buy_total", 0.0)
+            r.setdefault("category_id", "")
             if not isinstance(r.get("must_include_any"), list):
                 r["must_include_any"] = []
             if not isinstance(r.get("exclude_words"), list):
@@ -535,14 +536,16 @@ def iso_utc(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def search_live_bin(token: str, marketplace_id: str, q: str, limit: int) -> List[Dict[str, Any]]:
+def search_live_bin(token: str, marketplace_id: str, q: str, limit: int, category_id: str = "") -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     params = {"q": q, "limit": min(limit, 200), "filter": "buyingOptions:{FIXED_PRICE}"}
+    if category_id:
+        params["category_ids"] = category_id
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int) -> List[Dict[str, Any]]:
+def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "") -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     now = datetime.now(timezone.utc)
     end = now + timedelta(hours=int(ending_within_hours))
@@ -551,14 +554,16 @@ def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: 
         "limit": min(limit, 200),
         "filter": f"buyingOptions:{{AUCTION}},itemEndDate:[{iso_utc(now)}..{iso_utc(end)}]",
     }
+    if category_id:
+        params["category_ids"] = category_id
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int) -> List[Dict[str, Any]]:
+def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "") -> List[Dict[str, Any]]:
     items = []
-    items += search_live_bin(token, marketplace_id, q, limit)
-    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours)
+    items += search_live_bin(token, marketplace_id, q, limit, category_id)
+    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours, category_id)
 
     seen = set()
     merged = []
@@ -924,6 +929,7 @@ def run_rare_scan(
         packaging = float(r.get("packaging", 0.0))
         extra_costs = float(r.get("extra_costs", 0.0))
         target_profit = float(r.get("target_profit", 0.0))
+        category_id = str(r.get("category_id", "")).strip()
 
         mx_buy = net_after_fees(sell_price, fee_rate, ship_out, packaging) - extra_costs - target_profit
         net_before_buy = net_after_fees(sell_price, fee_rate, ship_out, packaging) - extra_costs
@@ -932,11 +938,11 @@ def run_rare_scan(
             df_live = pd.DataFrame(columns=["title","price","shipping_in","buy_total","condition","url","make_offer","mode"])
         else:
             if scan_mode == "bin":
-                items = search_live_bin(token, marketplace, query, per_item_limit)
+                items = search_live_bin(token, marketplace, query, per_item_limit, category_id)
             elif scan_mode == "auctions_ending":
-                items = search_live_auctions_ending(token, marketplace, query, per_item_limit, ending_hours)
+                items = search_live_auctions_ending(token, marketplace, query, per_item_limit, ending_hours, category_id)
             else:
-                items = search_live_both(token, marketplace, query, per_item_limit, ending_hours)
+                items = search_live_both(token, marketplace, query, per_item_limit, ending_hours, category_id)
 
             df_live = live_to_df(items)
             df_live = _enforce_auction_window(df_live, ending_hours)
@@ -1665,6 +1671,12 @@ with tabs[4]:
     with st.expander("➕ Add new rare item", expanded=False):
         new_item_name = st.text_input("Item name", value="", key="add_rare_name")
         new_item_query = st.text_input("Search query (eBay)", value="", key="add_rare_query")
+        new_item_category = st.text_input(
+            "eBay Category ID (optional — restricts search to this category)",
+            value="",
+            key="add_rare_category",
+            help="e.g. 139973 for Video Games. Leave blank to search all categories."
+        )
         new_item_must = st.text_input("Must-include words (ANY match – OR logic, comma separated)", value="", key="add_rare_must")
         new_item_excl = st.text_input("Exclude words (comma separated)", value="", key="add_rare_excl")
 
@@ -1689,6 +1701,7 @@ with tabs[4]:
                 rare_items[rid] = {
                     "name": new_item_name.strip(),
                     "search_query": new_item_query.strip() or new_item_name.strip(),
+                    "category_id": new_item_category.strip(),
                     "sell_price": float(new_sell),
                     "fee_rate": float(new_fee),
                     "ship_out": float(new_ship_out),
@@ -1722,6 +1735,12 @@ with tabs[4]:
         with col1:
             r["name"] = st.text_input("Item name", value=r.get("name", ""), key=kr + "name")
             r["search_query"] = st.text_input("Search query", value=r.get("search_query", ""), key=kr + "search_query")
+            r["category_id"] = st.text_input(
+                "eBay Category ID (optional — restricts search to this category)",
+                value=str(r.get("category_id", "")),
+                key=kr + "category_id",
+                help="e.g. 139973 for Video Games. Leave blank to search all categories."
+            )
             r["sell_price"] = st.number_input("Sell price (£)", value=float(r.get("sell_price", 0.0)), step=5.0, format="%.2f", key=kr + "sell")
             r["min_buy_total"] = st.number_input("Min buy_total (£) (item + shipping in)", value=float(r.get("min_buy_total", 0.0)), step=5.0, format="%.2f", key=kr + "min_buy_total")
         with col2:
