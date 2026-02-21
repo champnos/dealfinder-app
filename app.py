@@ -1696,9 +1696,11 @@ with tabs[4]:
                         _tree = st.session_state["ebay_category_tree"]
 
                         def _search_tree(node, parent_name, kw, results):
-                            ci = node.get("category", {})
-                            name = ci.get("categoryName", "")
-                            cid = ci.get("categoryId", "")
+                            if not isinstance(node, dict):
+                                return
+                            cat = node.get("category", {})
+                            name = cat.get("categoryName", "")
+                            cid = cat.get("categoryId", "")
                             if kw in name.lower():
                                 results.append({
                                     "Category Name": name,
