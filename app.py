@@ -1661,6 +1661,60 @@ with tabs[3]:
 with tabs[4]:
     st.subheader("Rare items (collectibles)")
 
+    # eBay Category Lookup tool
+    with st.expander("🔍 Browse eBay Categories"):
+        cat_query = st.text_input(
+            "Search category name (e.g. nintendo 64, coins, video games)",
+            key="cat_lookup_query"
+        )
+        if st.button("Look up", key="cat_lookup_btn"):
+            if not cat_query.strip():
+                st.warning("Please enter a search term.")
+            elif offline_mode:
+                st.info("Category lookup is not available in offline mode.")
+            else:
+                _cat_client_id = os.getenv("EBAY_CLIENT_ID", "").strip()
+                _cat_client_secret = os.getenv("EBAY_CLIENT_SECRET", "").strip()
+                if not _cat_client_id or not _cat_client_secret:
+                    st.error("eBay credentials not configured.")
+                else:
+                    try:
+                        if "ebay_category_tree" not in st.session_state:
+                            _cat_token = get_app_token(_cat_client_id, _cat_client_secret)
+                            _cat_r = requests.get(
+                                "https://api.ebay.com/commerce/taxonomy/v1/category_tree/3",
+                                headers={"Authorization": f"Bearer {_cat_token}"},
+                                timeout=30,
+                            )
+                            _cat_r.raise_for_status()
+                            st.session_state["ebay_category_tree"] = _cat_r.json()
+                        _tree = st.session_state["ebay_category_tree"]
+
+                        def _search_tree(node, parent_name, kw, results):
+                            ci = node.get("category", {})
+                            name = ci.get("categoryName", "")
+                            cid = ci.get("categoryId", "")
+                            if kw in name.lower():
+                                results.append({
+                                    "Category Name": name,
+                                    "Category ID": cid,
+                                    "Parent Category": parent_name,
+                                })
+                            for child in node.get("childCategoryTreeNodes", []):
+                                _search_tree(child, name, kw, results)
+
+                        _kw = cat_query.strip().lower()
+                        _results = []
+                        for _root in _tree.get("rootCategoryNode", {}).get("childCategoryTreeNodes", []):
+                            _search_tree(_root, "", _kw, _results)
+
+                        if _results:
+                            st.dataframe(pd.DataFrame(_results), use_container_width=True)
+                        else:
+                            st.info("No matching categories found.")
+                    except Exception:
+                        st.error("Could not fetch category tree from eBay. Check credentials.")
+
     # Add new rare item
     with st.expander("➕ Add new rare item", expanded=False):
         new_item_name = st.text_input("Item name", value="", key="add_rare_name")
