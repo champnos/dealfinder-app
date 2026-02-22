@@ -1696,6 +1696,8 @@ with tabs[4]:
                         _tree = st.session_state["ebay_category_tree"]
 
                         def _search_tree(node, parent_name, kw, results):
+                            if not isinstance(node, dict):  # guard against null nodes from eBay API
+                                return
                             ci = node.get("category", {})
                             name = ci.get("categoryName", "")
                             cid = ci.get("categoryId", "")
