@@ -1695,22 +1695,27 @@ with tabs[4]:
                             st.session_state["ebay_category_tree"] = _cat_r.json()
                         _tree = st.session_state["ebay_category_tree"]
 
-                        def _search_tree(node, parent_name, kw, results):
-                            ci = node.get("category", {})
-                            name = ci.get("categoryName", "")
-                            cid = ci.get("categoryId", "")
-                            if kw in name.lower():
-                                results.append({
-                                    "Category Name": name,
-                                    "Category ID": cid,
-                                    "Parent Category": parent_name,
-                                })
-                            for child in (node.get("childCategoryTreeNodes") or []):
-                                _search_tree(child, name, kw, results)
+                        def _search_tree(root, kw, results):
+                            stack = [(root, "")]
+                            while stack:
+                                node, parent_name = stack.pop()
+                                if not isinstance(node, dict):
+                                    continue
+                                cat = node.get("category", {})
+                                name = cat.get("categoryName", "")
+                                cid = cat.get("categoryId", "")
+                                if kw in name.lower():
+                                    results.append({
+                                        "Category Name": name,
+                                        "Category ID": cid,
+                                        "Parent Category": parent_name,
+                                    })
+                                for child in (node.get("childCategoryTreeNodes") or []):
+                                    stack.append((child, name))
 
-                        _kw = cat_query.strip().lower()
                         _results = []
-                        _search_tree(_tree.get("rootCategoryNode", {}), "", _kw, _results)
+                        _kw = cat_query.strip().lower()
+                        _search_tree(_tree.get("rootCategoryNode", {}), _kw, _results)
 
                         if _results:
                             st.dataframe(pd.DataFrame(_results), use_container_width=True)
