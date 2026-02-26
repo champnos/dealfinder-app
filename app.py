@@ -42,6 +42,7 @@ API_COUNTER_PATH = os.path.join(SCRIPT_DIR, "dealfinder_api_calls.json")
 SCAN_LOCK_PATH = os.path.join(SCRIPT_DIR, "dealfinder_scan.lock")
 SCAN_LOCK_MAX_AGE_MIN = 30  # stale lock auto-clear
 EBAY_DAILY_LIMIT = 5000  # typical default for Browse API; adjust if your account differs
+FETCH_LIMIT = 200  # eBay Browse API max per request
 
 def _today_ymd() -> str:
     return datetime.now().strftime("%Y-%m-%d")
@@ -535,16 +536,19 @@ def iso_utc(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def search_live_bin(token: str, marketplace_id: str, q: str, limit: int, category_id: str = "") -> List[Dict[str, Any]]:
+def search_live_bin(token: str, marketplace_id: str, q: str, limit: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     params = {"q": q, "limit": min(limit, 200), "filter": "buyingOptions:{FIXED_PRICE}"}
     if category_id:
         params["filter"] += f",categoryIds:{{{category_id}}}"
+    if max_price_gbp > 0:
+        params["filter"] += f",price:[0..{max_price_gbp}],priceCurrency:GBP"
+    params["sort"] = "price"
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "") -> List[Dict[str, Any]]:
+def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     now = datetime.now(timezone.utc)
     end = now + timedelta(hours=int(ending_within_hours))
@@ -555,14 +559,17 @@ def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: 
     }
     if category_id:
         params["filter"] += f",categoryIds:{{{category_id}}}"
+    if max_price_gbp > 0:
+        params["filter"] += f",price:[0..{max_price_gbp}],priceCurrency:GBP"
+    params["sort"] = "price"
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "") -> List[Dict[str, Any]]:
+def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     items = []
-    items += search_live_bin(token, marketplace_id, q, limit, category_id)
-    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours, category_id)
+    items += search_live_bin(token, marketplace_id, q, limit, category_id, max_price_gbp)
+    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours, category_id, max_price_gbp)
 
     seen = set()
     merged = []
@@ -762,7 +769,6 @@ def run_scan(
     scan_mode_label: str,
     scan_mode: str,
     ending_hours: int,
-    per_profile_limit: int,
     only_below_max_buy: bool,
     apply_condition_filter: bool,
     selected_conditions: List[str],
@@ -778,7 +784,45 @@ def run_scan(
             raise RuntimeError("Missing EBAY_CLIENT_ID / EBAY_CLIENT_SECRET in .env.")
         token = get_app_token(client_id, client_secret)
 
+    # Step 1: collect unique console_ids from selected_profiles (preserve order)
+    seen_cids: set = set()
+    unique_console_ids = []
+    for prof_name in selected_profiles:
+        p = profiles.get(prof_name, {})
+        cid = p.get("console_id")
+        if cid in consoles and cid not in seen_cids:
+            unique_console_ids.append(cid)
+            seen_cids.add(cid)
+
+    # Step 2: fetch and cache per (console_id, base)
+    items_by_console: Dict[str, List[Dict[str, Any]]] = {}
+    for console_id in unique_console_ids:
+        c = consoles[console_id]
+        if offline_mode:
+            items_by_console[console_id] = []
+            continue
+        cap = float(c.get("default_sell_price", 0.0))
+        bases = c.get("search_bases") or []
+        if not isinstance(bases, list):
+            bases = [str(bases)]
+        bases = [str(b).strip() for b in bases if str(b).strip()]
+        if not bases:
+            bases = [str(c.get("search_base", "")).strip()]
+        bases = [b for b in bases if b]
+        items: List[Dict[str, Any]] = []
+        for b in bases:
+            if scan_mode == "bin":
+                items += search_live_bin(token, marketplace, b, FETCH_LIMIT, max_price_gbp=cap)
+            elif scan_mode == "auctions_ending":
+                items += search_live_auctions_ending(token, marketplace, b, FETCH_LIMIT, ending_hours, max_price_gbp=cap)
+            else:
+                items += search_live_both(token, marketplace, b, FETCH_LIMIT, ending_hours, max_price_gbp=cap)
+        items_by_console[console_id] = items
+
+    # Step 3: per-profile loop, reuse cached items
     all_rows = []
+    filter_log: List[Dict[str, Any]] = []
+    raw_dfs: List[pd.DataFrame] = []
 
     for prof_name in selected_profiles:
         p = profiles.get(prof_name, {})
@@ -788,14 +832,6 @@ def run_scan(
         c = consoles[console_id]
 
         fault_q = str(p.get("fault_query", "")).strip()
-        bases = c.get("search_bases") or []
-        if not isinstance(bases, list):
-            bases = [str(bases)]
-        bases = [str(b).strip() for b in bases if str(b).strip()]
-        if not bases:
-            bases = [str(c.get("search_base", "")).strip()]
-        bases = [b for b in bases if b]
-        queries = [f"{b} {fault_q}".strip() for b in bases] if fault_q else bases
 
         sell_price = float(p.get("sell_price_override") or c.get("default_sell_price", 0.0))
         fee_rate = float(c.get("fee_rate", 0.13))
@@ -809,39 +845,41 @@ def run_scan(
         mx_buy = max_buy_price(sell_price, fee_rate, ship_out, packaging, parts, extra_costs, target_profit)
         net_before_buy = net_after_fees(sell_price, fee_rate, ship_out, packaging) - parts - extra_costs
 
+        all_items = items_by_console.get(console_id, [])
+        df_live = live_to_df(all_items)
 
-        if offline_mode:
-            # Keep app functional without API keys: return empty
-            df_live = pd.DataFrame(columns=["title","price","shipping_in","buy_total","condition","url","make_offer","mode"])
-        else:
-            all_items: List[Dict[str, Any]] = []
-            for q in queries:
-                if not str(q).strip():
-                    continue
-                if scan_mode == "bin":
-                    all_items += search_live_bin(token, marketplace, q, per_profile_limit)
-                elif scan_mode == "auctions_ending":
-                    all_items += search_live_auctions_ending(token, marketplace, q, per_profile_limit, ending_hours)
-                else:
-                    all_items += search_live_both(token, marketplace, q, per_profile_limit, ending_hours)
+        # Capture raw snapshot before any filtering
+        df_raw_snapshot = df_live.copy()
+        raw_dfs.append(df_raw_snapshot)
+        filter_log.append({"Stage": "Raw API results", "Kept": len(df_live), "Dropped": 0})
 
-            df_live = live_to_df(all_items)
-            # Enforce auction ending window (also catches Auction+BIN listings that came via BIN search)
-            df_live = _enforce_auction_window(df_live, ending_hours)
-            # BIN mode: exclude auctions (incl auction+BIN) after mode labeling
-            if scan_mode == "bin" and "mode" in df_live.columns:
-                df_live = df_live[df_live["mode"] != "Auction"].copy()
+        # 1. Enforce auction ending window
+        prev = len(df_live)
+        df_live = _enforce_auction_window(df_live, ending_hours)
+        filter_log.append({"Stage": "After auction window", "Kept": len(df_live), "Dropped": prev - len(df_live)})
 
+        # BIN mode: exclude auctions (incl auction+BIN) after mode labeling
+        if scan_mode == "bin" and "mode" in df_live.columns:
+            df_live = df_live[df_live["mode"] != "Auction"].copy()
 
         if df_live.empty:
             continue
 
-        # Filters (word filters first, then dedupe)
+        # 2. Must-include words
+        prev = len(df_live)
         df_live = title_must_include_filter(df_live, c.get("must_include_any", []))
+        filter_log.append({"Stage": "After must-include words", "Kept": len(df_live), "Dropped": prev - len(df_live)})
+
+        # 3. Exclude words (console + profile) and fault_query as local title filter
+        prev = len(df_live)
         df_live = title_exclude_filter(df_live, c.get("exclude_words", []))
         df_live = title_exclude_filter(df_live, p.get("exclude_words", []))
+        if fault_q:
+            df_live = title_must_include_filter(df_live, [fault_q])
+        filter_log.append({"Stage": "After exclude words", "Kept": len(df_live), "Dropped": prev - len(df_live)})
 
-        # Dedupe AFTER word filters (Option A)
+        # 4. Dedupe
+        prev = len(df_live)
         if "url" in df_live.columns and not df_live.empty:
             def _iid_from_url(u: str) -> str:
                 u = str(u or "")
@@ -850,20 +888,31 @@ def run_scan(
             df_live = df_live.copy()
             df_live["_iid"] = df_live["url"].apply(_iid_from_url)
             df_live = df_live.drop_duplicates(subset=["_iid"]).drop(columns=["_iid"])
+        filter_log.append({"Stage": "After dedupe", "Kept": len(df_live), "Dropped": prev - len(df_live)})
 
-        # Non-word filters
+        # 5. min_buy_total
+        prev = len(df_live)
         df_live = min_buy_total_filter(df_live, float(c.get("min_buy_total", 0.0)))
+        filter_log.append({"Stage": "After min_buy_total", "Kept": len(df_live), "Dropped": prev - len(df_live)})
 
+        # 6. Condition filter
+        prev = len(df_live)
         if apply_condition_filter:
             df_live = condition_filter(df_live, selected_conditions)
+        filter_log.append({"Stage": "After condition filter", "Kept": len(df_live), "Dropped": prev - len(df_live)})
 
         if df_live.empty:
             continue
 
+        # 7. below_max_buy (optional)
         if only_below_max_buy:
+            prev = len(df_live)
             df_live = below_max_buy_filter(df_live, mx_buy)
+            filter_log.append({"Stage": "After below_max_buy", "Kept": len(df_live), "Dropped": prev - len(df_live)})
             if df_live.empty:
                 continue
+
+        # 8. Compute max_buy, est_profit, good_buy
         df_live["console"] = c.get("name", console_id)
         df_live["profile"] = prof_name
         df_live["max_buy"] = float(mx_buy)
@@ -871,6 +920,16 @@ def run_scan(
         df_live["good_buy"] = df_live["buy_total"] <= mx_buy
 
         all_rows.append(df_live)
+
+    # Store debug data in session_state
+    try:
+        if raw_dfs:
+            st.session_state["last_scan_raw_df"] = pd.concat(raw_dfs, ignore_index=True)
+        else:
+            st.session_state["last_scan_raw_df"] = pd.DataFrame()
+        st.session_state["last_scan_filter_log"] = filter_log
+    except Exception:
+        pass
 
     if not all_rows:
         return pd.DataFrame()
@@ -898,7 +957,6 @@ def run_rare_scan(
     scan_mode_label: str,
     scan_mode: str,
     ending_hours: int,
-    per_item_limit: int,
     only_below_max_buy: bool,
     apply_condition_filter: bool,
     selected_conditions: List[str],
@@ -937,11 +995,11 @@ def run_rare_scan(
             df_live = pd.DataFrame(columns=["title","price","shipping_in","buy_total","condition","url","make_offer","mode"])
         else:
             if scan_mode == "bin":
-                items = search_live_bin(token, marketplace, query, per_item_limit, category_id)
+                items = search_live_bin(token, marketplace, query, FETCH_LIMIT, category_id)
             elif scan_mode == "auctions_ending":
-                items = search_live_auctions_ending(token, marketplace, query, per_item_limit, ending_hours, category_id)
+                items = search_live_auctions_ending(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id)
             else:
-                items = search_live_both(token, marketplace, query, per_item_limit, ending_hours, category_id)
+                items = search_live_both(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id)
 
             df_live = live_to_df(items)
             df_live = _enforce_auction_window(df_live, ending_hours)
@@ -1128,11 +1186,6 @@ with st.sidebar:
                 st.session_state["ending_hours"] = int(_ui_scan.get("ending_hours"))
         except Exception:
             pass
-        try:
-            if _ui_scan.get("per_profile_limit") is not None:
-                st.session_state["per_profile_limit"] = int(_ui_scan.get("per_profile_limit"))
-        except Exception:
-            pass
         if isinstance(_ui_scan.get("only_below_max_buy"), bool):
             st.session_state["only_below_max_buy"] = _ui_scan.get("only_below_max_buy")
         st.session_state["_ui_loaded_scan_settings"] = True
@@ -1163,14 +1216,6 @@ with st.sidebar:
         int(st.session_state.get("ending_hours", 24)),
         key="ending_hours",
         on_change=lambda: persist_ui_key("ending_hours"),
-    )
-
-    per_profile_limit = st.slider(
-        "Listings per profile per mode",
-        10, 200,
-        int(st.session_state.get("per_profile_limit", 60)),
-        key="per_profile_limit",
-        on_change=lambda: persist_ui_key("per_profile_limit"),
     )
 
     only_below_max_buy = st.toggle(
@@ -1287,7 +1332,6 @@ with tabs[0]:
                     scan_mode_label=scan_mode_label,
                     scan_mode=scan_mode,
                     ending_hours=ending_hours,
-                    per_profile_limit=per_profile_limit,
                     only_below_max_buy=only_below_max_buy,
                     apply_condition_filter=apply_condition_filter,
                     selected_conditions=selected_conditions,
@@ -1306,6 +1350,19 @@ with tabs[0]:
     last_ts = st.session_state.get("last_scan_ts")
     if last_ts:
         st.caption(f"Last scan: {last_ts:%Y-%m-%d %H:%M:%S}")
+
+    _raw_df = st.session_state.get("last_scan_raw_df")
+    _filter_log = st.session_state.get("last_scan_filter_log")
+    if _raw_df is not None:
+        with st.expander("🔍 Raw results (before filtering)", expanded=False):
+            if _raw_df.empty:
+                st.warning("No listings returned from eBay API — check credentials, search terms, or API limits")
+            else:
+                _raw_cols = [col for col in ["title", "price", "condition", "mode", "end_date", "url"] if col in _raw_df.columns]
+                st.dataframe(_raw_df[_raw_cols], use_container_width=True)
+    if _filter_log:
+        with st.expander("📊 Filter breakdown", expanded=False):
+            st.dataframe(pd.DataFrame(_filter_log))
 
     if df_all is None:
         st.info("Run a scan to see results.")
@@ -1594,7 +1651,6 @@ with tabs[3]:
                     scan_mode_label=scan_mode_label,
                     scan_mode=scan_mode,
                     ending_hours=ending_hours,
-                    per_item_limit=per_profile_limit,
                     only_below_max_buy=only_below_max_buy,
                     apply_condition_filter=apply_condition_filter,
                     selected_conditions=selected_conditions,
