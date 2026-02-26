@@ -779,6 +779,17 @@ def run_scan(
         token = get_app_token(client_id, client_secret)
 
     all_rows = []
+    all_raw_rows: List[pd.DataFrame] = []
+    _fc = {
+        "raw": 0,
+        "after_auction": 0,
+        "after_must_include": 0,
+        "after_excl": 0,
+        "after_dedupe": 0,
+        "after_min_buy": 0,
+        "after_condition": 0,
+        "after_below_max_buy": 0,
+    }
 
     for prof_name in selected_profiles:
         p = profiles.get(prof_name, {})
@@ -826,11 +837,17 @@ def run_scan(
                     all_items += search_live_both(token, marketplace, q, per_profile_limit, ending_hours)
 
             df_live = live_to_df(all_items)
+
+            # Snapshot raw results before any filtering
+            all_raw_rows.append(df_live.copy())
+            _fc["raw"] += len(df_live)
+
             # Enforce auction ending window (also catches Auction+BIN listings that came via BIN search)
             df_live = _enforce_auction_window(df_live, ending_hours)
             # BIN mode: exclude auctions (incl auction+BIN) after mode labeling
             if scan_mode == "bin" and "mode" in df_live.columns:
                 df_live = df_live[df_live["mode"] != "Auction"].copy()
+            _fc["after_auction"] += len(df_live)
 
 
         if df_live.empty:
@@ -838,8 +855,10 @@ def run_scan(
 
         # Filters (word filters first, then dedupe)
         df_live = title_must_include_filter(df_live, c.get("must_include_any", []))
+        _fc["after_must_include"] += len(df_live)
         df_live = title_exclude_filter(df_live, c.get("exclude_words", []))
         df_live = title_exclude_filter(df_live, p.get("exclude_words", []))
+        _fc["after_excl"] += len(df_live)
 
         # Dedupe AFTER word filters (Option A)
         if "url" in df_live.columns and not df_live.empty:
@@ -850,12 +869,15 @@ def run_scan(
             df_live = df_live.copy()
             df_live["_iid"] = df_live["url"].apply(_iid_from_url)
             df_live = df_live.drop_duplicates(subset=["_iid"]).drop(columns=["_iid"])
+        _fc["after_dedupe"] += len(df_live)
 
         # Non-word filters
         df_live = min_buy_total_filter(df_live, float(c.get("min_buy_total", 0.0)))
+        _fc["after_min_buy"] += len(df_live)
 
         if apply_condition_filter:
             df_live = condition_filter(df_live, selected_conditions)
+        _fc["after_condition"] += len(df_live)
 
         if df_live.empty:
             continue
@@ -864,6 +886,8 @@ def run_scan(
             df_live = below_max_buy_filter(df_live, mx_buy)
             if df_live.empty:
                 continue
+        _fc["after_below_max_buy"] += len(df_live)
+
         df_live["console"] = c.get("name", console_id)
         df_live["profile"] = prof_name
         df_live["max_buy"] = float(mx_buy)
@@ -871,6 +895,30 @@ def run_scan(
         df_live["good_buy"] = df_live["buy_total"] <= mx_buy
 
         all_rows.append(df_live)
+
+    # Build raw df and filter log for debug display
+    if all_raw_rows:
+        df_raw = pd.concat(all_raw_rows, ignore_index=True)
+    else:
+        df_raw = pd.DataFrame(columns=["title", "price", "condition", "mode", "end_date", "url"])
+
+    def _fl(stage: str, kept: int, prev: int) -> Dict[str, Any]:
+        return {"Stage": stage, "Kept": kept, "Dropped": prev - kept}
+
+    raw_n = _fc["raw"]
+    filter_log = [
+        {"Stage": "Raw API results", "Kept": raw_n, "Dropped": 0},
+        _fl("After auction window / mode filter", _fc["after_auction"], raw_n),
+        _fl("After console must-include words", _fc["after_must_include"], _fc["after_auction"]),
+        _fl("After exclude words (console + profile)", _fc["after_excl"], _fc["after_must_include"]),
+        _fl("After dedupe", _fc["after_dedupe"], _fc["after_excl"]),
+        _fl("After min_buy_total filter", _fc["after_min_buy"], _fc["after_dedupe"]),
+        _fl("After condition filter", _fc["after_condition"], _fc["after_min_buy"]),
+        _fl("After below_max_buy filter", _fc["after_below_max_buy"], _fc["after_condition"]),
+    ]
+
+    st.session_state["last_scan_raw_df"] = df_raw
+    st.session_state["last_scan_filter_log"] = filter_log
 
     if not all_rows:
         return pd.DataFrame()
@@ -1054,6 +1102,10 @@ if "last_scan_df" not in st.session_state:
     st.session_state["last_scan_df"] = None
 if "last_scan_ts" not in st.session_state:
     st.session_state["last_scan_ts"] = None
+if "last_scan_raw_df" not in st.session_state:
+    st.session_state["last_scan_raw_df"] = None
+if "last_scan_filter_log" not in st.session_state:
+    st.session_state["last_scan_filter_log"] = None
 
 
 
@@ -1306,6 +1358,31 @@ with tabs[0]:
     last_ts = st.session_state.get("last_scan_ts")
     if last_ts:
         st.caption(f"Last scan: {last_ts:%Y-%m-%d %H:%M:%S}")
+
+    # Debug / transparency expanders (only shown after a scan has run)
+    _raw_df = st.session_state.get("last_scan_raw_df")
+    _filter_log = st.session_state.get("last_scan_filter_log")
+    if _raw_df is not None or _filter_log is not None:
+        with st.expander("🔍 Raw results (before filtering)", expanded=False):
+            if _raw_df is None or _raw_df.empty:
+                st.warning("No listings returned from eBay API — check credentials, search terms, or API limits")
+            else:
+                _raw_cols = [c for c in ["title", "price", "condition", "mode", "end_date", "url"] if c in _raw_df.columns]
+                st.dataframe(
+                    _raw_df[_raw_cols],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "price": st.column_config.NumberColumn("Price", format="£%.2f"),
+                        "url": st.column_config.LinkColumn("URL", display_text="Open"),
+                    },
+                )
+
+        with st.expander("📊 Filter breakdown", expanded=False):
+            if _filter_log:
+                st.dataframe(pd.DataFrame(_filter_log), use_container_width=True, hide_index=True)
+            else:
+                st.info("No filter data available.")
 
     if df_all is None:
         st.info("Run a scan to see results.")
