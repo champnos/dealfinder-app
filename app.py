@@ -536,19 +536,20 @@ def iso_utc(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def search_live_bin(token: str, marketplace_id: str, q: str, limit: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
+def search_live_bin(token: str, marketplace_id: str, q: str, limit: int, category_id: str = "", min_price_gbp: float = 0.0, max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     params = {"q": q, "limit": min(limit, 200), "filter": "buyingOptions:{FIXED_PRICE}"}
     if category_id:
         params["filter"] += f",categoryIds:{{{category_id}}}"
     if max_price_gbp > 0:
-        params["filter"] += f",price:[0..{max_price_gbp}],priceCurrency:GBP"
+        min_str = f"{min_price_gbp:.2f}" if min_price_gbp > 0 else "0"
+        params["filter"] += f",price:[{min_str}..{max_price_gbp:.2f}],priceCurrency:GBP"
     params["sort"] = "price"
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
+def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", min_price_gbp: float = 0.0, max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     now = datetime.now(timezone.utc)
     end = now + timedelta(hours=int(ending_within_hours))
@@ -560,16 +561,17 @@ def search_live_auctions_ending(token: str, marketplace_id: str, q: str, limit: 
     if category_id:
         params["filter"] += f",categoryIds:{{{category_id}}}"
     if max_price_gbp > 0:
-        params["filter"] += f",price:[0..{max_price_gbp}],priceCurrency:GBP"
+        min_str = f"{min_price_gbp:.2f}" if min_price_gbp > 0 else "0"
+        params["filter"] += f",price:[{min_str}..{max_price_gbp:.2f}],priceCurrency:GBP"
     params["sort"] = "price"
     data = ebay_get_json(BROWSE_SEARCH_URL, headers=headers, params=params, timeout=30)
     return data.get("itemSummaries", [])
 
 
-def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
+def search_live_both(token: str, marketplace_id: str, q: str, limit: int, ending_within_hours: int, category_id: str = "", min_price_gbp: float = 0.0, max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     items = []
-    items += search_live_bin(token, marketplace_id, q, limit, category_id, max_price_gbp)
-    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours, category_id, max_price_gbp)
+    items += search_live_bin(token, marketplace_id, q, limit, category_id, min_price_gbp, max_price_gbp)
+    items += search_live_auctions_ending(token, marketplace_id, q, limit, ending_within_hours, category_id, min_price_gbp, max_price_gbp)
 
     seen = set()
     merged = []
@@ -802,6 +804,7 @@ def run_scan(
             items_by_console[console_id] = []
             continue
         cap = float(c.get("default_sell_price", 0.0))
+        min_price = float(c.get("min_buy_total", 0.0))
         bases = c.get("search_bases") or []
         if not isinstance(bases, list):
             bases = [str(bases)]
@@ -812,11 +815,11 @@ def run_scan(
         items: List[Dict[str, Any]] = []
         for b in bases:
             if scan_mode == "bin":
-                items += search_live_bin(token, marketplace, b, FETCH_LIMIT, max_price_gbp=cap)
+                items += search_live_bin(token, marketplace, b, FETCH_LIMIT, min_price_gbp=min_price, max_price_gbp=cap)
             elif scan_mode == "auctions_ending":
-                items += search_live_auctions_ending(token, marketplace, b, FETCH_LIMIT, ending_hours, max_price_gbp=cap)
+                items += search_live_auctions_ending(token, marketplace, b, FETCH_LIMIT, ending_hours, min_price_gbp=min_price, max_price_gbp=cap)
             else:
-                items += search_live_both(token, marketplace, b, FETCH_LIMIT, ending_hours, max_price_gbp=cap)
+                items += search_live_both(token, marketplace, b, FETCH_LIMIT, ending_hours, min_price_gbp=min_price, max_price_gbp=cap)
         items_by_console[console_id] = items
 
     # Step 3: per-profile loop, reuse cached items
@@ -995,12 +998,13 @@ def run_rare_scan(
         if offline_mode:
             df_live = pd.DataFrame(columns=["title","price","shipping_in","buy_total","condition","url","make_offer","mode"])
         else:
+            min_price = float(r.get("min_buy_total", 0.0))
             if scan_mode == "bin":
-                items = search_live_bin(token, marketplace, query, FETCH_LIMIT, category_id)
+                items = search_live_bin(token, marketplace, query, FETCH_LIMIT, category_id, min_price_gbp=min_price, max_price_gbp=mx_buy)
             elif scan_mode == "auctions_ending":
-                items = search_live_auctions_ending(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id)
+                items = search_live_auctions_ending(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id, min_price_gbp=min_price, max_price_gbp=mx_buy)
             else:
-                items = search_live_both(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id)
+                items = search_live_both(token, marketplace, query, FETCH_LIMIT, ending_hours, category_id, min_price_gbp=min_price, max_price_gbp=mx_buy)
 
             df_live = live_to_df(items)
             df_live = _enforce_auction_window(df_live, ending_hours)

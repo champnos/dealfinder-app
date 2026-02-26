@@ -177,7 +177,7 @@ def get_app_token(client_id: str, client_secret: str) -> str:
     return r.json()["access_token"]
 
 
-def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) -> List[Dict[str, Any]]:
+def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str, min_price_gbp: float = 0.0, max_price_gbp: float = 0.0) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
     items = []
 
@@ -190,15 +190,21 @@ def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) 
         r.raise_for_status()
         return r.json().get("itemSummaries", [])
 
+    def _append_price_filter(filter_string: str) -> str:
+        if max_price_gbp > 0:
+            min_str = f"{min_price_gbp:.2f}" if min_price_gbp > 0 else "0"
+            filter_string += f",price:[{min_str}..{max_price_gbp:.2f}],priceCurrency:GBP"
+        return filter_string
+
     if mode in ("bin", "both"):
-        params = {"q": q, "limit": min(limit, 200), "filter": "buyingOptions:{FIXED_PRICE}"}
+        params = {"q": q, "limit": min(limit, 200), "filter": _append_price_filter("buyingOptions:{FIXED_PRICE}")}
         items += _get(params)
 
     if mode in ("auctions_ending", "both"):
         params = {
             "q": q,
             "limit": min(limit, 200),
-            "filter": "buyingOptions:{AUCTION}",
+            "filter": _append_price_filter("buyingOptions:{AUCTION}"),
         }
         items += _get(params)
 
@@ -349,13 +355,6 @@ def main():
 
         queries = [f"{b} {fault_q}".strip() for b in bases] if fault_q else bases
 
-        all_items: List[Dict[str, Any]] = []
-        for q in queries:
-            if not q:
-                continue
-            all_items += search_live(token, marketplace, q, PER_PROFILE_LIMIT, SCAN_MODE)
-
-
         sell_price = float(p.get("sell_price_override") or c.get("default_sell_price", 0.0))
         fee_rate = float(c.get("fee_rate", 0.13))
         ship_out = float(c.get("ship_out", 0.0))
@@ -371,6 +370,12 @@ def main():
         console_excl = c.get("exclude_words", []) or []
         profile_excl = p.get("exclude_words", []) or []
         min_buy_total = float(c.get("min_buy_total", 0.0) or 0.0)
+
+        all_items: List[Dict[str, Any]] = []
+        for q in queries:
+            if not q:
+                continue
+            all_items += search_live(token, marketplace, q, PER_PROFILE_LIMIT, SCAN_MODE, min_price_gbp=min_buy_total, max_price_gbp=mx_buy)
 
         # Word filters first, then dedupe (matches app behaviour)
         must_words = _norm_words_csv(must_any)
