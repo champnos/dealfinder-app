@@ -912,9 +912,10 @@ def run_scan(
             if df_live.empty:
                 continue
 
-        # 8. Compute max_buy, est_profit, good_buy
+        # 8. Compute max_buy, min_buy, est_profit, good_buy
         df_live["console"] = c.get("name", console_id)
         df_live["profile"] = prof_name
+        df_live["min_buy"] = float(c.get("min_buy_total", 0.0))
         df_live["max_buy"] = float(mx_buy)
         df_live["est_profit"] = net_before_buy - df_live["buy_total"]
         df_live["good_buy"] = df_live["buy_total"] <= mx_buy
@@ -1029,6 +1030,7 @@ def run_rare_scan(
                 continue
 
         df_live["item"] = r.get("name", item_id)
+        df_live["min_buy"] = float(r.get("min_buy_total", 0.0))
         df_live["max_buy"] = float(mx_buy)
         df_live["est_profit"] = net_before_buy - df_live["buy_total"]
         df_live["good_buy"] = df_live["buy_total"] <= mx_buy
@@ -1391,7 +1393,7 @@ with tabs[0]:
             ["deal", "offer", "mode", "console", "profile",
              "seller_feedback", "seller_positive",
              "first_seen",
-             "price", "shipping_in", "buy_total", "max_buy", "est_profit",
+             "price", "shipping_in", "buy_total", "min_buy", "max_buy", "est_profit",
              "condition", "title", "open"]
         ].copy()
 
@@ -1409,6 +1411,7 @@ with tabs[0]:
                 "price": st.column_config.NumberColumn("Price", format="£%.2f"),
                 "shipping_in": st.column_config.NumberColumn("Ship in", format="£%.2f"),
                 "buy_total": st.column_config.NumberColumn("Buy total", format="£%.2f"),
+                "min_buy": st.column_config.NumberColumn("Min buy", format="£%.2f"),
                 "max_buy": st.column_config.NumberColumn("Max buy", format="£%.2f"),
                 "est_profit": st.column_config.NumberColumn("Est profit", format="£%.2f"),
                 "open": st.column_config.LinkColumn("Open", display_text="Open"),
@@ -1683,7 +1686,7 @@ with tabs[3]:
             df_table = df_table[
                 ["deal", "offer", "mode", "item",
                  "first_seen",
-                 "price", "shipping_in", "buy_total", "max_buy", "est_profit",
+                 "price", "shipping_in", "buy_total", "min_buy", "max_buy", "est_profit",
                  "condition", "title", "open"]
             ].copy()
 
@@ -1701,6 +1704,7 @@ with tabs[3]:
                     "price": st.column_config.NumberColumn("Price", format="£%.2f"),
                     "shipping_in": st.column_config.NumberColumn("Ship in", format="£%.2f"),
                     "buy_total": st.column_config.NumberColumn("Buy total", format="£%.2f"),
+                    "min_buy": st.column_config.NumberColumn("Min buy", format="£%.2f"),
                     "max_buy": st.column_config.NumberColumn("Max buy", format="£%.2f"),
                     "est_profit": st.column_config.NumberColumn("Est profit", format="£%.2f"),
                     "open": st.column_config.LinkColumn("Open", display_text="Open"),
