@@ -1,4 +1,3 @@
-
 import os
 import json
 import time
@@ -55,7 +54,6 @@ def _passes_word_filters(title: str, must_any: List[str], exclude_any: List[str]
         return False
     return True
 
-
 # -----------------------------
 # File helpers
 # -----------------------------
@@ -88,7 +86,6 @@ def load_notified_ids() -> set:
 
 def save_notified_ids(s: set) -> None:
     save_json_atomic(NOTIFIED_PATH, sorted(list(s)))
-
 
 # -----------------------------
 # Shared API calls counter (app + scanner)
@@ -175,7 +172,6 @@ def get_app_token(client_id: str, client_secret: str) -> str:
     r = requests.post(EBAY_OAUTH_URL, auth=auth, data=data, headers=headers, timeout=30)
     r.raise_for_status()
     return r.json()["access_token"]
-
 
 def search_live(token: str, marketplace_id: str, q: str, limit: int, mode: str) -> List[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}", "X-EBAY-C-MARKETPLACE-ID": marketplace_id}
