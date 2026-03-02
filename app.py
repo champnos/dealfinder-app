@@ -615,40 +615,39 @@ def _parse_end_date(item: Dict[str, Any]) -> Any:
         return None
 
 
-def _enforce_auction_window(df: pd.DataFrame, ending_within_hours: int) -> pd.DataFrame:
-    """Keep non-auctions. Keep auctions only if ending within window. Fail-closed on missing end date."""
-    if df is None or df.empty:
-        return df
-    if "mode" not in df.columns or "end_date" not in df.columns:
-        return df
-    try:
-        now = datetime.now(timezone.utc)
-        end_limit = now + timedelta(hours=int(ending_within_hours))
-    except Exception:
-        return df
-
-    end_dt = pd.to_datetime(df["end_date"], utc=True, errors="coerce")
-    is_auction = df["mode"].astype(str).str.lower().eq("auction")
-    keep = (~is_auction) | (end_dt.notna() & (end_dt >= now) & (end_dt <= end_limit))
-    return df.loc[keep].copy()
-
-def live_to_df(items: List[Dict[str, Any]]) -> pd.DataFrame:
+def live_to_df(items: List[Dict[str, Any]], ending_within_hours: int = 24) -> pd.DataFrame:
     rows = []
+    now = datetime.now(timezone.utc)
+    end_limit = now + timedelta(hours=int(ending_within_hours))
     for it in items:
         mode = _detect_item_mode_label(it)
 
-        # Price handling:
-        # - If mode is Auction (including Auction+BIN listings), show current bid where available.
-        # - Otherwise show the fixed price.
+        # Price handling for auctions: apply window logic.
+        # - Within window: use current bid price (fallback bidPrice, fallback price)
+        # - Outside window + has BIN (FIXED_PRICE option): use BIN price (price field)
+        # - Outside window + no BIN (pure auction): skip
+        # For non-auction listings: use price as normal.
         price_val = None
         try:
             if mode == "Auction":
-                # Browse API may include currentBidPrice for auctions.
-                price_val = (it.get("currentBidPrice") or {}).get("value")
-                if price_val is None:
-                    # Fallbacks seen in some payloads
-                    price_val = (it.get("bidPrice") or {}).get("value")
-            if price_val is None:
+                opts = it.get("buyingOptions") or []
+                if isinstance(opts, str):
+                    opts = [opts]
+                opts_norm = {str(o).strip().upper() for o in opts}
+                has_bin = "FIXED_PRICE" in opts_norm
+                end_dt = _parse_end_date(it)
+                within_window = (end_dt is not None) and (end_dt >= now) and (end_dt <= end_limit)
+                if within_window:
+                    price_val = (it.get("currentBidPrice") or {}).get("value")
+                    if price_val is None:
+                        price_val = (it.get("bidPrice") or {}).get("value")
+                    if price_val is None:
+                        price_val = (it.get("price") or {}).get("value")
+                elif has_bin:
+                    price_val = (it.get("price") or {}).get("value")
+                else:
+                    continue
+            else:
                 price_val = (it.get("price") or {}).get("value")
         except Exception:
             price_val = (it.get("price") or {}).get("value")
@@ -825,9 +824,7 @@ def run_scan(
                 else:
                     all_items += search_live_both(token, marketplace, q, per_profile_limit, ending_hours)
 
-            df_live = live_to_df(all_items)
-            # Enforce auction ending window (also catches Auction+BIN listings that came via BIN search)
-            df_live = _enforce_auction_window(df_live, ending_hours)
+            df_live = live_to_df(all_items, ending_hours)
             # BIN mode: exclude auctions (incl auction+BIN) after mode labeling
             if scan_mode == "bin" and "mode" in df_live.columns:
                 df_live = df_live[df_live["mode"] != "Auction"].copy()
@@ -943,8 +940,7 @@ def run_rare_scan(
             else:
                 items = search_live_both(token, marketplace, query, per_item_limit, ending_hours, category_id)
 
-            df_live = live_to_df(items)
-            df_live = _enforce_auction_window(df_live, ending_hours)
+            df_live = live_to_df(items, ending_hours)
 
             # BIN mode: exclude auctions (incl auction+BIN) after mode labeling
             if scan_mode == "bin" and "mode" in df_live.columns:

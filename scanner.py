@@ -5,7 +5,7 @@ import time
 import atexit
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Tuple
 
 import requests
@@ -220,8 +220,45 @@ def detect_make_offer(item: Dict[str, Any]) -> bool:
     opts = {str(o).strip().upper() for o in opts}
     return ("BEST_OFFER" in opts) or ("MAKE_OFFER" in opts)
 
-def item_buy_total(item: Dict[str, Any]) -> Tuple[float, float, float]:
-    price_val = (item.get("price") or {}).get("value")
+def item_buy_total(item: Dict[str, Any], ending_hours: int = 1) -> Tuple[float, float, float]:
+    opts = item.get("buyingOptions") or []
+    if isinstance(opts, str):
+        opts = [opts]
+    opts_norm = {str(o).strip().upper() for o in opts}
+    is_auction = "AUCTION" in opts_norm
+    has_bin = "FIXED_PRICE" in opts_norm
+
+    price_val = None
+    if is_auction:
+        now = datetime.now(timezone.utc)
+        end_limit = now + timedelta(hours=int(ending_hours))
+        end_dt = None
+        try:
+            s = item.get("itemEndDate") or item.get("endDate") or ""
+            s = str(s).strip()
+            if s:
+                if s.endswith("Z"):
+                    s = s[:-1] + "+00:00"
+                end_dt = datetime.fromisoformat(s)
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
+                end_dt = end_dt.astimezone(timezone.utc)
+        except Exception:
+            end_dt = None
+        within_window = (end_dt is not None) and (end_dt >= now) and (end_dt <= end_limit)
+        if within_window:
+            price_val = (item.get("currentBidPrice") or {}).get("value")
+            if price_val is None:
+                price_val = (item.get("bidPrice") or {}).get("value")
+            if price_val is None:
+                price_val = (item.get("price") or {}).get("value")
+        elif has_bin:
+            price_val = (item.get("price") or {}).get("value")
+        else:
+            return (0.0, 0.0, 0.0)
+    else:
+        price_val = (item.get("price") or {}).get("value")
+
     if price_val is None:
         return (0.0, 0.0, 0.0)
     price = float(price_val)
@@ -403,7 +440,7 @@ def main():
                 continue
 
 
-            price, ship_in, buy_total = item_buy_total(it)
+            price, ship_in, buy_total = item_buy_total(it, ending_hours=1)
             if buy_total <= 0 or buy_total < min_buy_total:
                 continue
 
